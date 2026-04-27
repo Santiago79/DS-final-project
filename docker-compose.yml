@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  backend:
+    container_name: accessflow-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://accessflow_user:accessflow_pass@db:5432/accessflow_db
+      - JWT_SECRET=your-secret-key-change-in-production
+      - CORS_ORIGINS=http://localhost:8501,http://frontend:8501
+      - LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - accessflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    container_name: accessflow-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - BACKEND_API_URL=http://backend:8000
+      - LOG_LEVEL=INFO
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    networks:
+      - accessflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: postgres:15-alpine
+    container_name: accessflow-db
+    environment:
+      - POSTGRES_USER=accessflow_user
+      - POSTGRES_PASSWORD=accessflow_pass
+      - POSTGRES_DB=accessflow_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - accessflow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accessflow_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  accessflow-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
