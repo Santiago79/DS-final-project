@@ -1,138 +1,190 @@
 name: CI/CD Pipeline
 
 on:
-  pull_request:
-    branches: [dev, main]
   push:
-    branches: [dev, main]
+    branches:
+      - main
+      - dev
     tags:
-      - 'v*'
+      - "v*"
+  pull_request:
 
 env:
   REGISTRY: docker.io
-  DOCKER_IMAGE_BACKEND: ${{ secrets.DOCKERHUB_USERNAME }}/accessflow-backend
-  DOCKER_IMAGE_FRONTEND: ${{ secrets.DOCKERHUB_USERNAME }}/accessflow-frontend
+  DOCKER_IMAGE_BACKEND: ${{ secrets.DOCKERHUB_USERNAME }}/pset-accesflow-backend
+  DOCKER_IMAGE_FRONTEND: ${{ secrets.DOCKERHUB_USERNAME }}/pset-accesflow-frontend
 
 jobs:
-  # ==================== CI: Pull Request a Dev/Main ====================
-  ci-pr:
-    if: github.event_name == 'pull_request'
+  lint:
     runs-on: ubuntu-latest
-    name: "CI: PR a Dev/Main"
-    
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
 
       - name: Install dependencies
-        working-directory: ./backend
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest black isort pylint
+        run: pip install -r backend/requirements.txt ruff
 
-      - name: Lint (Black)
-        working-directory: ./backend
-        run: black --check . || true
+      - name: Run lint
+        run: ruff check backend/
 
-      - name: Lint (isort)
-        working-directory: ./backend
-        run: isort --check-only . || true
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Lint (Pylint)
-        working-directory: ./backend
-        run: pylint app/ --exit-zero || true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt pytest pytest-asyncio
 
       - name: Run tests
-        working-directory: ./backend
-        run: pytest tests/ -v || true
+        run: pytest backend/tests/ -v || true
 
-      - name: Build image
-        run: |
-          docker build -t ${{ env.DOCKER_IMAGE_BACKEND }}:dev-pr ./backend
-          docker build -t ${{ env.DOCKER_IMAGE_FRONTEND }}:dev-pr ./frontend
+  docker-build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  # ==================== CD: Merge a Dev ====================
-  cd-dev:
+      - name: Build Backend image (test)
+        run: docker build -t ${{ env.DOCKER_IMAGE_BACKEND }}:latest ./backend
+
+      - name: Build Frontend image (test)
+        run: docker build -t ${{ env.DOCKER_IMAGE_FRONTEND }}:latest ./frontend
+
+  docker-push-dev:
+    needs: docker-build
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
-    name: "CD: Deploy Dev"
-    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Login Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Backend
-        uses: docker/build-push-action@v5
+      - name: Extract Docker metadata for Backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE_BACKEND }}
+          tags: |
+            type=raw,value=dev
+            type=sha,prefix=dev-
+
+      - name: Build & Push Backend (dev)
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE_BACKEND }}:dev
-            ${{ env.DOCKER_IMAGE_BACKEND }}:dev-${{ github.sha }}
+          platforms: linux/amd64
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
 
-      - name: Build and push Frontend
-        uses: docker/build-push-action@v5
+      - name: Extract Docker metadata for Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE_FRONTEND }}
+          tags: |
+            type=raw,value=dev
+            type=sha,prefix=dev-
+
+      - name: Build & Push Frontend (dev)
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/accessflow-frontend:dev
-            ${{ secrets.DOCKERHUB_USERNAME }}/accessflow-frontend:dev-${{ github.sha }}
+          platforms: linux/amd64
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
 
-      - name: Deploy to Render Dev
-        run: |
-          curl -X POST ${{ secrets.RENDER_DEV_DEPLOY_HOOK }}
-
-  # ==================== CD: Production (via tag o main) ====================
-  cd-prod:
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+  deploy-dev:
+    needs: docker-push-dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
-    name: "CD: Deploy Prod"
-    
     steps:
-      - uses: actions/checkout@v4
+      - name: Deploy Backend Dev
+        run: curl -X POST ${{ secrets.RENDER_BACKEND_DEV_HOOK }}
 
-      - name: Get version
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Deploy Frontend Dev
+        run: curl -X POST ${{ secrets.RENDER_FRONTEND_DEV_HOOK }}
 
-      - name: Login Docker Hub
+  docker-push-prod:
+    needs: docker-build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Backend (Prod)
-        uses: docker/build-push-action@v5
+      - name: Extract Docker metadata for Backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE_BACKEND }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=prod
+            type=ref,event=tag
+            type=sha
+
+      - name: Build & Push Backend (prod)
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE_BACKEND }}:latest
-            ${{ env.DOCKER_IMAGE_BACKEND }}:${{ steps.version.outputs.VERSION }}
-            ${{ env.DOCKER_IMAGE_BACKEND }}:prod
+          platforms: linux/amd64
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
 
-      - name: Build and push Frontend (Prod)
-        uses: docker/build-push-action@v5
+      - name: Extract Docker metadata for Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE_FRONTEND }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=prod
+            type=ref,event=tag
+            type=sha
+
+      - name: Build & Push Frontend (prod)
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/accessflow-frontend:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/accessflow-frontend:${{ steps.version.outputs.VERSION }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/accessflow-frontend:prod
+          platforms: linux/amd64
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
 
-      - name: Deploy to Render Prod
-        run: |
-          curl -X POST ${{ secrets.RENDER_PROD_DEPLOY_HOOK }}
+  deploy-prod:
+    needs: docker-push-prod
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Backend Prod
+        run: curl -X POST ${{ secrets.RENDER_BACKEND_PROD_HOOK }}
+
+      - name: Deploy Frontend Prod
+        run: curl -X POST ${{ secrets.RENDER_FRONTEND_PROD_HOOK }}
