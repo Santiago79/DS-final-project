@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
   push:
-    branches: [dev]
+    branches: [dev, main]
     tags:
       - 'v*'
 
@@ -14,11 +14,11 @@ env:
   DOCKER_IMAGE_FRONTEND: ${{ secrets.DOCKERHUB_USERNAME }}/accessflow-frontend
 
 jobs:
-  # ==================== CI: Pull Request a Dev ====================
+  # ==================== CI: Pull Request a Dev/Main ====================
   ci-pr:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    name: "CI: PR a Dev"
+    name: "CI: PR a Dev/Main"
     
     steps:
       - uses: actions/checkout@v4
@@ -94,9 +94,9 @@ jobs:
         run: |
           curl -X POST ${{ secrets.RENDER_DEV_DEPLOY_HOOK }}
 
-  # ==================== CD: Production (via tag) ====================
+  # ==================== CD: Production (via tag o main) ====================
   cd-prod:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     name: "CD: Deploy Prod"
     
