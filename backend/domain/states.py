@@ -54,6 +54,15 @@ class RequestState(ABC):
     def complete_provisioning(self, request: AccessRequest, it_admin: User) -> None:
         """Completar el provisioning del acceso."""
         pass
+    
+    def finalize_approval(self, request: AccessRequest) -> None:
+        """
+        Pasar la solicitud a READY_FOR_PROVISIONING.
+        Solo aplica en APPROVED. Por defecto lanza error.
+        """
+        raise InvalidStateTransitionError(
+            f"finalize_approval no es válido en el estado {request.status.value}"
+        )
 
 
 # ============================================================
@@ -223,7 +232,8 @@ class ApprovedState(RequestState):
     """
     Estado: APPROVED
     La solicitud fue aprobada por todos los revisores requeridos.
-    El sistema la mueve automáticamente a READY_FOR_PROVISIONING.
+    La capa de aplicación (servicio) debe llamar a finalize_approval() 
+    para pasar a READY_FOR_PROVISIONING.
     """
 
     def submit(self, request: AccessRequest) -> None:
@@ -253,7 +263,13 @@ class ApprovedState(RequestState):
         raise InvalidStateTransitionError(
             "La solicitud debe pasar primero a READY_FOR_PROVISIONING."
         )
-
+    def finalize_approval(self, request: AccessRequest) -> None:
+        """
+        Pasar la solicitud a READY_FOR_PROVISIONING.
+        Este método debe ser llamado por la capa de aplicación (servicio)
+        después de que la solicitud llegue al estado APPROVED.
+        """
+        request._transition_to(RequestStatus.READY_FOR_PROVISIONING)
 
 class ReadyForProvisioningState(RequestState):
     """
