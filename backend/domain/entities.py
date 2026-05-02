@@ -109,7 +109,7 @@ class AccessRequest:
     def status(self) -> RequestStatus:
         """Retorna el estado actual de la solicitud."""
         return self._status
-
+ 
     @property
     def state(self) -> RequestState:
         """Retorna el estado lógico de la solicitud."""

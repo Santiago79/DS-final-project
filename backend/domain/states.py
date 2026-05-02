@@ -1,5 +1,5 @@
 """
-State Pattern para el ciclo de vida de una solicitud de acceso (AccessRequest).
+State Pattern para el ciclo de vida de una solicitud de acceso.
 """
 
 from __future__ import annotations
