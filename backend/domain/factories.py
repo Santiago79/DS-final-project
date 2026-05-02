@@ -29,7 +29,6 @@ class AccessRequestFactory:
         manager_id: Optional[str] = None
     ) -> AccessRequest:
         
-        # Validación temprana de expiración obligatoria para ADMIN
         if access_level == AccessLevel.ADMIN and expiration_date is None:
             raise ExpirationRequiredError(
                 "Los accesos de nivel ADMIN requieren una fecha de expiración obligatoria."
@@ -48,52 +47,66 @@ class AccessRequestFactory:
 
 
 # ============================================================
+# Approval Steps
+# ============================================================
+
+class ApprovalStep(ABC):
+    """Objeto que representa un paso individual en el pipeline de aprobación."""
+    @abstractmethod
+    def get_role(self) -> UserRole:
+        pass
+        
+    @abstractmethod
+    def get_step_name(self) -> str:
+        pass
+
+
+class ManagerApprovalStep(ApprovalStep):
+    def get_role(self) -> UserRole:
+        return UserRole.MANAGER
+        
+    def get_step_name(self) -> str:
+        return "MANAGER_REVIEW"
+
+
+class SecurityApprovalStep(ApprovalStep):
+    def get_role(self) -> UserRole:
+        return UserRole.SECURITY_REVIEWER
+        
+    def get_step_name(self) -> str:
+        return "SECURITY_REVIEW"
+
+
+# ============================================================
 # Approval Flow Factories (Abstract Factory Pattern)
 # ============================================================
 
 class ApprovalFlowFactory(ABC):
     """
     Abstract Factory para crear pipelines de aprobación.
-    Devuelve una lista ordenada de roles que deben aprobar la solicitud.
+    Devuelve una lista ordenada de objetos ApprovalStep.
     """
     @abstractmethod
-    def create_approval_pipeline(self) -> List[UserRole]:
+    def create_approval_pipeline(self) -> List[ApprovalStep]:
         pass
 
 
 class StandardApprovalFlowFactory(ApprovalFlowFactory):
     """Flujo estándar: Solo requiere la aprobación del Manager directo."""
-    def create_approval_pipeline(self) -> List[UserRole]:
-        return [UserRole.MANAGER]
+    def create_approval_pipeline(self) -> List[ApprovalStep]:
+        return [ManagerApprovalStep()]
 
 
 class AdminApprovalFlowFactory(ApprovalFlowFactory):
     """Flujo Admin: Requiere primero al Manager, luego al equipo de Seguridad."""
-    def create_approval_pipeline(self) -> List[UserRole]:
-        return [UserRole.MANAGER, UserRole.SECURITY_REVIEWER]
+    def create_approval_pipeline(self) -> List[ApprovalStep]:
+        return [ManagerApprovalStep(), SecurityApprovalStep()]
 
 
 class ProductiveDatabaseFlowFactory(ApprovalFlowFactory):
     """
     Flujo para Bases de Datos Productivas: 
-    Requiere primero a Seguridad (para evaluar riesgo inmediato) y luego al Manager.
+    Requiere primero a Seguridad (riesgo inmediato) y luego al Manager.
     """
-    def create_approval_pipeline(self) -> List[UserRole]:
-        return [UserRole.SECURITY_REVIEWER, UserRole.MANAGER]
-
-# ============================================================
-# Selector Automático de Factory
-# ============================================================
-
-def get_approval_flow_factory(request: AccessRequest) -> ApprovalFlowFactory:
-    """
-    Evalúa el contexto de la solicitud y retorna la fábrica de
-    flujo de aprobación correspondiente.
-    """
-    if request.system_type == SystemType.PRODUCTIVE_DATABASE:
-        return ProductiveDatabaseFlowFactory()
-    
-    if request.access_level == AccessLevel.ADMIN:
-        return AdminApprovalFlowFactory()
-        
-    return StandardApprovalFlowFactory()
+    def create_approval_pipeline(self) -> List[ApprovalStep]:
+        return [SecurityApprovalStep(), ManagerApprovalStep()]
