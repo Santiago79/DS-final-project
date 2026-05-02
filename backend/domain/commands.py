@@ -69,6 +69,8 @@ class SubmitRequestCommand(RequestCommand):
         self.request.submit()
         event = AccessRequestSubmittedEvent(request=self.request)
         self.event_bus.publish(event)
+        manager_event = ManagerApprovalRequiredEvent(request=self.request)
+        self.event_bus.publish(manager_event)
 
 
 class ApproveRequestCommand(RequestCommand):
