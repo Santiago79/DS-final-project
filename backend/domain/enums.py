@@ -38,3 +38,7 @@ class SystemType(Enum):
     ADMIN_PANEL = "ADMIN_PANEL"
     PRODUCTIVE_DATABASE = "PRODUCTIVE_DATABASE"
     OTHER = "OTHER"
+
+class NotificationStatus(Enum):
+    PENDING = "PENDING"
+    READ = "READ"
