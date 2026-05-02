@@ -218,6 +218,11 @@ class AccessRequest:
     def complete_provisioning(self, it_admin: User) -> None:
         self.state.complete_provisioning(self, it_admin)
         self.updated_at = datetime.now(timezone.utc)
+
+    def finalize_approval(self) -> None:
+        """Delega el paso a READY_FOR_PROVISIONING al estado actual."""
+        self.state.finalize_approval(self)
+        self.updated_at = datetime.now(timezone.utc)
 # ============================================================
 # AuditLog
 # ============================================================

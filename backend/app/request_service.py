@@ -1,6 +1,6 @@
 # application/request_service.py
 
-from backend.domain.entities import User
+from domain.entities import User
 from domain.enums import RequestStatus
 from domain.exceptions import InvalidStateTransitionError, SelfApprovalError, UnauthorizedError
 
