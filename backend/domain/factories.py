@@ -80,20 +80,20 @@ class ProductiveDatabaseFlowFactory(ApprovalFlowFactory):
     """
     def create_approval_pipeline(self) -> List[UserRole]:
         return [UserRole.SECURITY_REVIEWER, UserRole.MANAGER]
-
-# ============================================================
-# Selector Automático de Factory
-# ============================================================
-
-def get_approval_flow_factory(request: AccessRequest) -> ApprovalFlowFactory:
-    """
-    Evalúa el contexto de la solicitud y retorna la fábrica de
-    flujo de aprobación correspondiente.
-    """
-    if request.system_type == SystemType.PRODUCTIVE_DATABASE:
-        return ProductiveDatabaseFlowFactory()
     
-    if request.access_level == AccessLevel.ADMIN:
-        return AdminApprovalFlowFactory()
+    # ============================================================
+    # Selector Automático de Factory
+    # ============================================================
+
+    def get_approval_flow_factory(request: AccessRequest) -> ApprovalFlowFactory:
+        """
+        Evalúa el contexto de la solicitud y retorna la fábrica de
+        flujo de aprobación correspondiente.
+        """
+        if request.system_type == SystemType.PRODUCTIVE_DATABASE:
+            return ProductiveDatabaseFlowFactory()
         
-    return StandardApprovalFlowFactory()
+        if request.access_level == AccessLevel.ADMIN:
+            return AdminApprovalFlowFactory()
+            
+        return StandardApprovalFlowFactory()
