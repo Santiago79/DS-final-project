@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 from typing import List
 
 from domain.entities import AccessRequest
-from domain.enums import AccessLevel, SystemType, UserRole
+from domain.enums import AccessLevel, SystemType
 from domain.factories import (
     AdminApprovalFlowFactory,
     ApprovalFlowFactory,
+    ApprovalStep,
     ProductiveDatabaseFlowFactory,
     StandardApprovalFlowFactory,
 )
@@ -18,11 +19,11 @@ from domain.factories import (
 class ApprovalPolicy(ABC):
     """
     Interfaz Strategy para determinar la política de aprobación.
-    Define el contrato para generar el pipeline de revisores.
+    Define el contrato para generar el pipeline de pasos de revisión.
     """
     @abstractmethod
-    def get_approval_pipeline(self) -> List[UserRole]:
-        """Retorna la lista de roles requeridos para la aprobación."""
+    def get_approval_pipeline(self) -> List[ApprovalStep]:
+        """Retorna la lista de pasos requeridos para la aprobación."""
         pass
 
 
@@ -35,7 +36,7 @@ class StandardApprovalPolicy(ApprovalPolicy):
     def __init__(self, factory: ApprovalFlowFactory = StandardApprovalFlowFactory()):
         self.factory = factory
 
-    def get_approval_pipeline(self) -> List[UserRole]:
+    def get_approval_pipeline(self) -> List[ApprovalStep]:
         return self.factory.create_approval_pipeline()
 
 
@@ -44,7 +45,7 @@ class AdminApprovalPolicy(ApprovalPolicy):
     def __init__(self, factory: ApprovalFlowFactory = AdminApprovalFlowFactory()):
         self.factory = factory
 
-    def get_approval_pipeline(self) -> List[UserRole]:
+    def get_approval_pipeline(self) -> List[ApprovalStep]:
         return self.factory.create_approval_pipeline()
 
 
@@ -53,7 +54,7 @@ class ProductiveDatabasePolicy(ApprovalPolicy):
     def __init__(self, factory: ApprovalFlowFactory = ProductiveDatabaseFlowFactory()):
         self.factory = factory
 
-    def get_approval_pipeline(self) -> List[UserRole]:
+    def get_approval_pipeline(self) -> List[ApprovalStep]:
         return self.factory.create_approval_pipeline()
 
 
