@@ -17,7 +17,7 @@ from domain.enums import (
     SystemType,
     UserRole,
 )
-
+from domain.states import RequestState, create_state_from_status
 
 
 # ============================================================
@@ -76,7 +76,8 @@ class AccessRequest:
     provisioned_by: Optional[str] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
+    _state: Optional[RequestState] = field(default=None, init=False, repr=False)
+    
     def __post_init__(self) -> None:
         # Validaciones básicas
         if not self.requester_id:
@@ -108,6 +109,14 @@ class AccessRequest:
     def status(self) -> RequestStatus:
         """Retorna el estado actual de la solicitud."""
         return self._status
+
+    @property
+    def state(self) -> RequestState:
+        """Retorna el estado lógico de la solicitud."""
+        if self._state is None:
+            self._state = create_state_from_status(self._status)
+        return self._state
+
 
     # ============================================================
     # Validaciones de reglas de negocio
@@ -177,15 +186,38 @@ class AccessRequest:
         return False
 
     # ============================================================
-    # Cambio de estado (luego delegará en State Pattern en #82)
+    # Cambio de estado 
     # ============================================================
 
     def _transition_to(self, new_status: RequestStatus) -> None:
         """Método interno para cambiar el estado de la solicitud."""
         self._status = new_status
+        self._state = None  # Invalida el estado lógico para que se regenere
         self.updated_at = datetime.now(timezone.utc)
 
+    def submit(self) -> None:
+        self.state.submit(self)
+        self.updated_at = datetime.now(timezone.utc)
 
+    def approve(self, reviewer: User) -> None:
+        self.state.approve(self, reviewer)
+        self.updated_at = datetime.now(timezone.utc)
+
+    def reject(self, reviewer: User, reason: str) -> None:
+        self.state.reject(self, reviewer, reason)
+        self.updated_at = datetime.now(timezone.utc)
+
+    def request_changes(self, reviewer: User, comment: str) -> None:
+        self.state.request_changes(self, reviewer, comment)
+        self.updated_at = datetime.now(timezone.utc)
+
+    def cancel(self) -> None:
+        self.state.cancel(self)
+        self.updated_at = datetime.now(timezone.utc)
+
+    def complete_provisioning(self, it_admin: User) -> None:
+        self.state.complete_provisioning(self, it_admin)
+        self.updated_at = datetime.now(timezone.utc)
 # ============================================================
 # AuditLog
 # ============================================================
