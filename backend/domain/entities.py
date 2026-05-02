@@ -114,7 +114,7 @@ class AccessRequest:
     def state(self) -> RequestState:
         """Retorna el estado lógico de la solicitud."""
         if self._state is None:
-            self._state = create_state_from_status(self._status)
+            self._state = create_state_from_status(self._status, self)
         return self._state
 
 
