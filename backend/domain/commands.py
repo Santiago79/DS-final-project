@@ -92,7 +92,7 @@ class ApproveRequestCommand(RequestCommand):
         self.request.approve(self.reviewer)
 
         # Publicar evento según el nuevo estado
-        if self.request.status.value == "SECURITY_REVIEW":
+        if self.request.status == RequestStatus.SECURITY_REVIEW:
             event = SecurityReviewRequiredEvent(request=self.request)
         else:
             event = AccessRequestApprovedEvent(
