@@ -18,10 +18,13 @@ from domain.events import (
     AccessProvisionedEvent,
     AccessExpiringSoonEvent,
 )
+from domain.enums import UserRole
 from domain.interfaces.observador_evento import ObservadorEvento
+from domain.interfaces.repositories import UserRepository
 from infrastructure.postgres import (
     PostgresNotificationRepository,
     PostgresAuditLogRepository,
+    PostgresUserRepository,
 )
 from sqlalchemy.orm import Session
 
@@ -37,16 +40,28 @@ class NotificationObserver(ObservadorEvento):
     Sends notifications to relevant users when important events occur.
     """
 
-    def __init__(self, notification_repo: PostgresNotificationRepository, session: Session):
+    def __init__(self, notification_repo: PostgresNotificationRepository, user_repo: UserRepository, session: Session):
         """
         Initialize the notification observer.
         
         Args:
             notification_repo: Repository for creating notifications
+            user_repo: Repository for querying users by role
             session: Database session for queries
         """
         self.notification_repo = notification_repo
+        self.user_repo = user_repo
         self.session = session
+
+    def _get_it_admin_users(self):
+        """Get all IT Admin users."""
+        all_users = self.user_repo.get_all()
+        return [user for user in all_users if user.role == UserRole.IT_ADMIN]
+
+    def _get_security_reviewers(self):
+        """Get all Security Reviewer users."""
+        all_users = self.user_repo.get_all()
+        return [user for user in all_users if user.role == UserRole.SECURITY_REVIEWER]
 
     def on_event(self, evento: Evento) -> None:
         """
@@ -87,13 +102,15 @@ class NotificationObserver(ObservadorEvento):
                 request_id=request.id,
             )
         
-        # Notify IT Admin (would need to query for IT_ADMIN users, simplified for now)
-        self.notification_repo.add(
-            user_id="IT_ADMIN",  # Placeholder - would need to query actual IT admins
-            title="Nueva solicitud de acceso creada",
-            message=f"Solicitud #{request.id} creada para {request.requester_name}",
-            request_id=request.id,
-        )
+        # Notify all IT Admins
+        it_admins = self._get_it_admin_users()
+        for it_admin in it_admins:
+            self.notification_repo.add(
+                user_id=it_admin.id,
+                title="Nueva solicitud de acceso creada",
+                message=f"Solicitud #{request.id} creada para {request.requester_name}",
+                request_id=request.id,
+            )
 
     def _on_request_submitted(self, evento: AccessRequestSubmittedEvent) -> None:
         """Notify manager when request is submitted for review."""
@@ -123,13 +140,15 @@ class NotificationObserver(ObservadorEvento):
         """Notify security reviewers when review is required."""
         request = evento.request
         
-        # Notify security reviewer (placeholder - would query for actual security reviewers)
-        self.notification_repo.add(
-            user_id="SECURITY_REVIEWER",  # Placeholder
-            title="Revisión de seguridad requerida",
-            message=f"Solicitud de acceso {request.access_level.value} a {request.target_system}",
-            request_id=request.id,
-        )
+        # Notify all Security Reviewers
+        security_reviewers = self._get_security_reviewers()
+        for reviewer in security_reviewers:
+            self.notification_repo.add(
+                user_id=reviewer.id,
+                title="Revisión de seguridad requerida",
+                message=f"Solicitud de acceso {request.access_level.value} a {request.target_system}",
+                request_id=request.id,
+            )
 
     def _on_request_approved(self, evento: AccessRequestApprovedEvent) -> None:
         """Notify requester when request is approved."""
