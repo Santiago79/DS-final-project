@@ -30,6 +30,9 @@ class AccessRequestResponse(BaseModel):
     requester_id: str
     target_system: str
     access_level: str
+    justification: Optional[str] = None
+    system_type: Optional[str] = None
+    expiration_date: Optional[date] = None
     status: str
     created_at: datetime
 

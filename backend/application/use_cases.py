@@ -3,7 +3,8 @@ from domain.entities import User
 from domain.factories import AccessRequestFactory
 from domain.commands import (
     CreateRequestCommand, ApproveRequestCommand, RejectRequestCommand, 
-    ProvisionAccessCommand, RequestChangesCommand, SubmitRequestCommand
+    ProvisionAccessCommand, RequestChangesCommand, SubmitRequestCommand,
+    CancelRequestCommand
 )
 from application.dtos import CreateAccessRequestDTO
 
@@ -36,6 +37,10 @@ class AccessRequestUseCases:
             raise HTTPException(status_code=404, detail="Solicitud no encontrada")
         return request
 
+    def list_requests(self, user: User):
+        # Por ahora retorna todas, luego se filtrará por rol en DB real
+        return self.repo.get_all()
+
     def approve_request(self, request_id: str, reviewer: User):
         request = self.get_request(request_id)
         ApproveRequestCommand(request, self.event_bus, reviewer).execute()
@@ -57,5 +62,11 @@ class AccessRequestUseCases:
     def provision_request(self, request_id: str, admin: User):
         request = self.get_request(request_id)
         ProvisionAccessCommand(request, self.event_bus, admin).execute()
+        self.repo.save(request)
+        return request
+
+    def cancel_request(self, request_id: str, user: User):
+        request = self.get_request(request_id)
+        CancelRequestCommand(request, self.event_bus).execute()
         self.repo.save(request)
         return request

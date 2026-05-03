@@ -15,8 +15,22 @@ from application.use_cases import AccessRequestUseCases
 
 router = APIRouter(tags=["AccessFlow API"])
 
+# Helper para mapear la respuesta
+def map_to_response(req) -> AccessRequestResponse:
+    return AccessRequestResponse(
+        id=str(req.id),
+        requester_id=req.requester_id,
+        target_system=req.target_system,
+        access_level=req.access_level.value,
+        justification=req.justification,
+        system_type=req.system_type.value,
+        expiration_date=req.expiration_date,
+        status=req.status.value,
+        created_at=req.created_at
+    )
+
 # ============================================================
-# Auth Endpoints (Issue 89)
+# Auth Endpoints
 # ============================================================
 
 @router.post("/auth/login", response_model=TokenResponse, tags=["Authentication"])
@@ -45,7 +59,7 @@ def login(request: LoginRequest, user_repo = Depends(get_user_repository)):
     )
 
 # ============================================================
-# Access Request Endpoints (Issue 91)
+# Access Request Endpoints
 # ============================================================
 
 @router.post("/requests", status_code=status.HTTP_201_CREATED, response_model=AccessRequestResponse, tags=["Access Requests"])
@@ -55,14 +69,15 @@ def create_access_request(
     use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
     req = use_cases.create_request(payload, current_user)
-    return AccessRequestResponse(id=str(req.id), requester_id=req.requester_id, target_system=req.target_system, access_level=req.access_level.value, status=req.status.value, created_at=req.created_at)
+    return map_to_response(req)
 
 @router.get("/requests", response_model=List[AccessRequestResponse], tags=["Access Requests"])
 def list_requests(
     current_user: User = Depends(get_current_user),
     use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    return [AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at) for r in use_cases.repo.get_all()]
+    requests = use_cases.list_requests(current_user)
+    return [map_to_response(r) for r in requests]
 
 @router.get("/requests/{request_id}", response_model=AccessRequestResponse, tags=["Access Requests"])
 def get_request_detail(
@@ -70,8 +85,8 @@ def get_request_detail(
     current_user: User = Depends(get_current_user),
     use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    r = use_cases.get_request(request_id)
-    return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
+    req = use_cases.get_request(request_id)
+    return map_to_response(req)
 
 @router.post("/requests/{request_id}/approve", response_model=AccessRequestResponse, tags=["Access Requests"])
 def approve_request(
@@ -79,8 +94,8 @@ def approve_request(
     current_user: User = Depends(require_any_role([UserRole.MANAGER, UserRole.SECURITY_REVIEWER])),
     use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    r = use_cases.approve_request(request_id, current_user)
-    return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
+    req = use_cases.approve_request(request_id, current_user)
+    return map_to_response(req)
 
 @router.post("/requests/{request_id}/reject", response_model=AccessRequestResponse, tags=["Access Requests"])
 def reject_request(
@@ -89,20 +104,39 @@ def reject_request(
     current_user: User = Depends(require_any_role([UserRole.MANAGER, UserRole.SECURITY_REVIEWER])),
     use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    r = use_cases.reject_request(request_id, current_user, payload.reason)
-    return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
+    req = use_cases.reject_request(request_id, current_user, payload.reason)
+    return map_to_response(req)
+
+@router.post("/requests/{request_id}/request-changes", response_model=AccessRequestResponse, tags=["Access Requests"])
+def request_changes(
+    request_id: str,
+    payload: ActionReasonDTO,
+    current_user: User = Depends(require_any_role([UserRole.MANAGER, UserRole.SECURITY_REVIEWER])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.request_changes(request_id, current_user, payload.reason)
+    return map_to_response(req)
+
+@router.post("/requests/{request_id}/cancel", response_model=AccessRequestResponse, tags=["Access Requests"])
+def cancel_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.cancel_request(request_id, current_user)
+    return map_to_response(req)
 
 @router.post("/requests/{request_id}/provision", response_model=AccessRequestResponse, tags=["Access Requests"])
 def provision_request(
     request_id: str,
-    current_user: User = Depends(require_role(UserRole.IT_ADMIN)),
+    current_user: User = Depends(require_any_role([UserRole.IT_ADMIN, UserRole.SYSTEM_ADMIN])),
     use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    r = use_cases.provision_request(request_id, current_user)
-    return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
+    req = use_cases.provision_request(request_id, current_user)
+    return map_to_response(req)
 
 # ============================================================
-# Utility Endpoints (Mocks)
+# Utility Endpoints (Mocks pendientes Issue de Observers)
 # ============================================================
 
 @router.get("/notifications", response_model=List[NotificationResponse], tags=["Utility"])
