@@ -1,7 +1,7 @@
 from domain.enums import UserRole
 from domain.entities import User
-from infrastructure.auth_provider import AuthProvider
 
+# Empezamos con la base de datos vacía para probar que el startup event funciona
 MOCK_USERS_DB = []
 
 class MockUserRepository:
@@ -14,7 +14,6 @@ class MockUserRepository:
         # Eliminamos si ya existe para reemplazarlo (simulando un UPSERT)
         MOCK_USERS_DB = [u for u in MOCK_USERS_DB if u.email != user.email]
         MOCK_USERS_DB.append(user)
-
 
 class MockRequestRepository:
     def __init__(self):
