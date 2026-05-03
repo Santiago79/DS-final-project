@@ -4,9 +4,6 @@ from datetime import date, datetime
 from domain.enums import AccessLevel, SystemType
 
 # --- Auth DTOs ---
-class LoginRequest(BaseModel):
-    email: str
-    password: str
 
 class TokenResponse(BaseModel):
     access_token: str
