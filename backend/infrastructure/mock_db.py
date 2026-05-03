@@ -2,43 +2,19 @@ from domain.enums import UserRole
 from domain.entities import User
 from infrastructure.auth_provider import AuthProvider
 
-MOCK_USERS_DB = [
-    User(
-        name="System Admin", 
-        email="admin@accessflow.com", 
-        hashed_password=AuthProvider.get_password_hash("admin123"), 
-        role=UserRole.SYSTEM_ADMIN
-    ),
-    User(
-        name="Employee", 
-        email="employee@accessflow.com", 
-        hashed_password=AuthProvider.get_password_hash("employee123"), 
-        role=UserRole.EMPLOYEE
-    ),
-    User(
-        name="Manager", 
-        email="manager@accessflow.com", 
-        hashed_password=AuthProvider.get_password_hash("manager123"), 
-        role=UserRole.MANAGER
-    ),
-    User(
-        name="Security Reviewer", 
-        email="security@accessflow.com", 
-        hashed_password=AuthProvider.get_password_hash("security123"), 
-        role=UserRole.SECURITY_REVIEWER
-    ),
-    User(
-        name="IT Admin", 
-        email="itadmin@accessflow.com", 
-        hashed_password=AuthProvider.get_password_hash("itadmin123"), 
-        role=UserRole.IT_ADMIN
-    ),
-]
+MOCK_USERS_DB = []
 
 class MockUserRepository:
     """Repositorio temporal para no ensuciar la API."""
     def get_by_email(self, email: str) -> User | None:
         return next((u for u in MOCK_USERS_DB if u.email == email), None)
+        
+    def save(self, user: User):
+        global MOCK_USERS_DB
+        # Eliminamos si ya existe para reemplazarlo (simulando un UPSERT)
+        MOCK_USERS_DB = [u for u in MOCK_USERS_DB if u.email != user.email]
+        MOCK_USERS_DB.append(user)
+
 
 class MockRequestRepository:
     def __init__(self):
