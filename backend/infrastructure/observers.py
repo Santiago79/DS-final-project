@@ -24,7 +24,6 @@ from domain.interfaces.repositories import UserRepository
 from infrastructure.postgres import (
     PostgresNotificationRepository,
     PostgresAuditLogRepository,
-    PostgresUserRepository,
 )
 from sqlalchemy.orm import Session
 
