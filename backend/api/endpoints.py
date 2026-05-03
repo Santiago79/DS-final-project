@@ -8,6 +8,14 @@ from api.guards import require_role, require_any_role
 from domain.enums import UserRole
 from domain.entities import User
 
+from typing import List
+from application.dtos import (
+    CreateAccessRequestDTO, AccessRequestResponse, ActionReasonDTO, 
+    NotificationResponse, AuditLogResponse
+)
+from application.use_cases import AccessRequestUseCases
+from api.dependencies import get_access_request_use_cases
+
 router = APIRouter(tags=["AccessFlow API"])
 
 # ============================================================
@@ -42,55 +50,72 @@ def login(request: LoginRequest, user_repo = Depends(get_user_repository)):
 
 
 # ============================================================
-# Access Request Endpoints (Issue 90)
+# Access Request Endpoints (Issue 91)
 # ============================================================
 
-# Dummy DTO para que no falle el endpoint de crear
-class CreateRequestDTO(BaseModel):
-    target_system: str
-    justification: str
-
-
-@router.post("/requests", status_code=status.HTTP_201_CREATED, tags=["Access Requests"])
+@router.post("/requests", status_code=status.HTTP_201_CREATED, response_model=AccessRequestResponse, tags=["Access Requests"])
 def create_access_request(
-    payload: CreateRequestDTO,
-    # Cualquier rol válido puede crear solicitudes (Employee o superior)
-    current_user: User = Depends(require_any_role([
-        UserRole.EMPLOYEE, 
-        UserRole.MANAGER, 
-        UserRole.SECURITY_REVIEWER, 
-        UserRole.IT_ADMIN
-    ]))
+    payload: CreateAccessRequestDTO,
+    current_user: User = Depends(require_any_role([UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.SECURITY_REVIEWER, UserRole.IT_ADMIN])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    """Crea una nueva solicitud de acceso."""
-    return {"message": "Solicitud creada exitosamente", "requester": current_user.email}
+    req = use_cases.create_request(payload, current_user)
+    return AccessRequestResponse(id=str(req.id), requester_id=req.requester_id, target_system=req.target_system, access_level=req.access_level.value, status=req.status.value, created_at=req.created_at)
 
+@router.get("/requests", response_model=List[AccessRequestResponse], tags=["Access Requests"])
+def list_requests(
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    # Por ahora retorna todo el mock, se filtrará por rol en DB real
+    return [AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at) for r in use_cases.repo.get_all()]
 
-@router.post("/requests/{request_id}/approve", tags=["Access Requests"])
+@router.get("/requests/{request_id}", response_model=AccessRequestResponse, tags=["Access Requests"])
+def get_request_detail(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    r = use_cases.get_request(request_id)
+    return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
+
+# Unificado para Manager o Security. El Use Case (vía Command) valida si el rol es correcto para el estado actual.
+@router.post("/requests/{request_id}/approve", response_model=AccessRequestResponse, tags=["Access Requests"])
 def approve_request(
     request_id: str,
-    # Solo los Managers pueden aprobar el primer paso
-    current_user: User = Depends(require_role(UserRole.MANAGER))
+    current_user: User = Depends(require_any_role([UserRole.MANAGER, UserRole.SECURITY_REVIEWER])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    """Aprueba una solicitud en la fase de Manager."""
-    return {"message": f"Solicitud {request_id} aprobada por el manager {current_user.email}"}
+    r = use_cases.approve_request(request_id, current_user)
+    return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
 
-
-@router.post("/requests/{request_id}/security-review", tags=["Access Requests"])
-def security_review_request(
+@router.post("/requests/{request_id}/reject", response_model=AccessRequestResponse, tags=["Access Requests"])
+def reject_request(
     request_id: str,
-    # Solo el equipo de Seguridad puede hacer estas revisiones
-    current_user: User = Depends(require_role(UserRole.SECURITY_REVIEWER))
+    payload: ActionReasonDTO,
+    current_user: User = Depends(require_any_role([UserRole.MANAGER, UserRole.SECURITY_REVIEWER])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    """Aprueba o revisa una solicitud en la fase de Seguridad."""
-    return {"message": f"Solicitud {request_id} aprobada por seguridad ({current_user.email})"}
+    r = use_cases.reject_request(request_id, current_user, payload.reason)
+    return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
 
-
-@router.post("/requests/{request_id}/provision", tags=["Access Requests"])
+@router.post("/requests/{request_id}/provision", response_model=AccessRequestResponse, tags=["Access Requests"])
 def provision_request(
     request_id: str,
-    # Solo IT Admin puede dar el acceso final en el sistema real
-    current_user: User = Depends(require_role(UserRole.IT_ADMIN))
+    current_user: User = Depends(require_role(UserRole.IT_ADMIN)),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    """Ejecuta el aprovisionamiento de una solicitud lista."""
-    return {"message": f"Acceso provisionado para la solicitud {request_id} por {current_user.email}"}
+    r = use_cases.provision_request(request_id, current_user)
+    return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
+
+# ============================================================
+# Utility Endpoints (Mocks por ahora)
+# ============================================================
+
+@router.get("/notifications", response_model=List[NotificationResponse], tags=["Utility"])
+def get_notifications(current_user: User = Depends(get_current_user)):
+    return []
+
+@router.get("/audit-log", response_model=List[AuditLogResponse], tags=["Utility"])
+def get_audit_log(current_user: User = Depends(require_role(UserRole.SYSTEM_ADMIN))):
+    return []
