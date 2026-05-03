@@ -6,6 +6,13 @@ from domain.entities import User
 from infrastructure.auth_provider import AuthProvider
 from infrastructure.mock_db import MockUserRepository
 
+from infrastructure.mock_db import MockRequestRepository, MockEventBus
+from application.use_cases import AccessRequestUseCases
+
+# Instancias en memoria para que sobrevivan a las peticiones
+request_repo_instance = MockRequestRepository()
+event_bus_instance = MockEventBus()
+
 # Le indica a FastAPI y a Swagger/OpenAPI dónde está el endpoint para pedir el token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
@@ -44,3 +51,17 @@ def get_current_user(
         raise credentials_exception
         
     return user
+
+
+def get_request_repository():
+    return request_repo_instance
+
+def get_event_bus():
+    return event_bus_instance
+
+def get_access_request_use_cases(
+    repo = Depends(get_request_repository),
+    bus = Depends(get_event_bus)
+) -> AccessRequestUseCases:
+    """Inyecta la capa de aplicación con sus dependencias resueltas."""
+    return AccessRequestUseCases(repo, bus)

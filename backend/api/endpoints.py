@@ -1,22 +1,40 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 
-from application.dtos import LoginRequest, TokenResponse
+from application.dtos import (
+    LoginRequest, TokenResponse, CreateAccessRequestDTO, 
+    AccessRequestResponse, ActionReasonDTO, 
+    NotificationResponse, AuditLogResponse
+)
 from infrastructure.auth_provider import AuthProvider
-from api.dependencies import get_user_repository
+from api.dependencies import get_user_repository, get_current_user, get_access_request_use_cases
 from api.guards import require_role, require_any_role
 from domain.enums import UserRole
 from domain.entities import User
+from application.use_cases import AccessRequestUseCases
 
 router = APIRouter(tags=["AccessFlow API"])
 
+# Helper para mapear la respuesta
+def map_to_response(req) -> AccessRequestResponse:
+    return AccessRequestResponse(
+        id=str(req.id),
+        requester_id=req.requester_id,
+        target_system=req.target_system,
+        access_level=req.access_level.value,
+        justification=req.justification,
+        system_type=req.system_type.value,
+        expiration_date=req.expiration_date,
+        status=req.status.value,
+        created_at=req.created_at
+    )
+
 # ============================================================
-# Auth Endpoints (Issue 89)
+# Auth Endpoints
 # ============================================================
 
 @router.post("/auth/login", response_model=TokenResponse, tags=["Authentication"])
 def login(request: LoginRequest, user_repo = Depends(get_user_repository)):
-    """Autentica a un usuario validando su email y contraseña."""
     user = user_repo.get_by_email(request.email)
     
     if not user or not AuthProvider.verify_password(request.password, user.hashed_password):
@@ -40,57 +58,91 @@ def login(request: LoginRequest, user_repo = Depends(get_user_repository)):
         role=user.role.value
     )
 
-
 # ============================================================
-# Access Request Endpoints (Issue 90)
+# Access Request Endpoints
 # ============================================================
 
-# Dummy DTO para que no falle el endpoint de crear
-class CreateRequestDTO(BaseModel):
-    target_system: str
-    justification: str
-
-
-@router.post("/requests", status_code=status.HTTP_201_CREATED, tags=["Access Requests"])
+@router.post("/requests", status_code=status.HTTP_201_CREATED, response_model=AccessRequestResponse, tags=["Access Requests"])
 def create_access_request(
-    payload: CreateRequestDTO,
-    # Cualquier rol válido puede crear solicitudes (Employee o superior)
-    current_user: User = Depends(require_any_role([
-        UserRole.EMPLOYEE, 
-        UserRole.MANAGER, 
-        UserRole.SECURITY_REVIEWER, 
-        UserRole.IT_ADMIN
-    ]))
+    payload: CreateAccessRequestDTO,
+    current_user: User = Depends(require_any_role([UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.SECURITY_REVIEWER, UserRole.IT_ADMIN])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    """Crea una nueva solicitud de acceso."""
-    return {"message": "Solicitud creada exitosamente", "requester": current_user.email}
+    req = use_cases.create_request(payload, current_user)
+    return map_to_response(req)
 
+@router.get("/requests", response_model=List[AccessRequestResponse], tags=["Access Requests"])
+def list_requests(
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    requests = use_cases.list_requests(current_user)
+    return [map_to_response(r) for r in requests]
 
-@router.post("/requests/{request_id}/approve", tags=["Access Requests"])
+@router.get("/requests/{request_id}", response_model=AccessRequestResponse, tags=["Access Requests"])
+def get_request_detail(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.get_request(request_id)
+    return map_to_response(req)
+
+@router.post("/requests/{request_id}/approve", response_model=AccessRequestResponse, tags=["Access Requests"])
 def approve_request(
     request_id: str,
-    # Solo los Managers pueden aprobar el primer paso
-    current_user: User = Depends(require_role(UserRole.MANAGER))
+    current_user: User = Depends(require_any_role([UserRole.MANAGER, UserRole.SECURITY_REVIEWER])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    """Aprueba una solicitud en la fase de Manager."""
-    return {"message": f"Solicitud {request_id} aprobada por el manager {current_user.email}"}
+    req = use_cases.approve_request(request_id, current_user)
+    return map_to_response(req)
 
-
-@router.post("/requests/{request_id}/security-review", tags=["Access Requests"])
-def security_review_request(
+@router.post("/requests/{request_id}/reject", response_model=AccessRequestResponse, tags=["Access Requests"])
+def reject_request(
     request_id: str,
-    # Solo el equipo de Seguridad puede hacer estas revisiones
-    current_user: User = Depends(require_role(UserRole.SECURITY_REVIEWER))
+    payload: ActionReasonDTO,
+    current_user: User = Depends(require_any_role([UserRole.MANAGER, UserRole.SECURITY_REVIEWER])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    """Aprueba o revisa una solicitud en la fase de Seguridad."""
-    return {"message": f"Solicitud {request_id} aprobada por seguridad ({current_user.email})"}
+    req = use_cases.reject_request(request_id, current_user, payload.reason)
+    return map_to_response(req)
 
+@router.post("/requests/{request_id}/request-changes", response_model=AccessRequestResponse, tags=["Access Requests"])
+def request_changes(
+    request_id: str,
+    payload: ActionReasonDTO,
+    current_user: User = Depends(require_any_role([UserRole.MANAGER, UserRole.SECURITY_REVIEWER])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.request_changes(request_id, current_user, payload.reason)
+    return map_to_response(req)
 
-@router.post("/requests/{request_id}/provision", tags=["Access Requests"])
+@router.post("/requests/{request_id}/cancel", response_model=AccessRequestResponse, tags=["Access Requests"])
+def cancel_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.cancel_request(request_id, current_user)
+    return map_to_response(req)
+
+@router.post("/requests/{request_id}/provision", response_model=AccessRequestResponse, tags=["Access Requests"])
 def provision_request(
     request_id: str,
-    # Solo IT Admin puede dar el acceso final en el sistema real
-    current_user: User = Depends(require_role(UserRole.IT_ADMIN))
+    current_user: User = Depends(require_any_role([UserRole.IT_ADMIN, UserRole.SYSTEM_ADMIN])),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    """Ejecuta el aprovisionamiento de una solicitud lista."""
-    return {"message": f"Acceso provisionado para la solicitud {request_id} por {current_user.email}"}
+    req = use_cases.provision_request(request_id, current_user)
+    return map_to_response(req)
+
+# ============================================================
+# Utility Endpoints (Mocks pendientes Issue de Observers)
+# ============================================================
+
+@router.get("/notifications", response_model=List[NotificationResponse], tags=["Utility"])
+def get_notifications(current_user: User = Depends(get_current_user)):
+    return []
+
+@router.get("/audit-log", response_model=List[AuditLogResponse], tags=["Utility"])
+def get_audit_log(current_user: User = Depends(require_role(UserRole.SYSTEM_ADMIN))):
+    return []
