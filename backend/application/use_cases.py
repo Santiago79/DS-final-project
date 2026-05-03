@@ -3,7 +3,7 @@ from domain.entities import User
 from domain.factories import AccessRequestFactory
 from domain.commands import (
     CreateRequestCommand, ApproveRequestCommand, RejectRequestCommand, 
-    ProvisionAccessCommand, CancelRequestCommand, RequestChangesCommand, SubmitRequestCommand
+    ProvisionAccessCommand, RequestChangesCommand, SubmitRequestCommand
 )
 from application.dtos import CreateAccessRequestDTO
 
@@ -13,7 +13,6 @@ class AccessRequestUseCases:
         self.event_bus = event_bus
 
     def create_request(self, dto: CreateAccessRequestDTO, user: User):
-        # 1. Usar Factory para crear la entidad
         request = AccessRequestFactory.create(
             requester_id=user.id,
             requester_name=user.name,
@@ -25,11 +24,9 @@ class AccessRequestUseCases:
             manager_id=dto.manager_id
         )
         
-        # 2. Ejecutar comandos de creación y envío
         CreateRequestCommand(request, self.event_bus).execute()
         SubmitRequestCommand(request, self.event_bus).execute()
         
-        # 3. Guardar en BD
         self.repo.save(request)
         return request
 

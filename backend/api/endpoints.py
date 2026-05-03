@@ -1,20 +1,17 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 
-from application.dtos import LoginRequest, TokenResponse
+from application.dtos import (
+    LoginRequest, TokenResponse, CreateAccessRequestDTO, 
+    AccessRequestResponse, ActionReasonDTO, 
+    NotificationResponse, AuditLogResponse
+)
 from infrastructure.auth_provider import AuthProvider
-from api.dependencies import get_user_repository
+from api.dependencies import get_user_repository, get_current_user, get_access_request_use_cases
 from api.guards import require_role, require_any_role
 from domain.enums import UserRole
 from domain.entities import User
-
-from typing import List
-from application.dtos import (
-    CreateAccessRequestDTO, AccessRequestResponse, ActionReasonDTO, 
-    NotificationResponse, AuditLogResponse
-)
 from application.use_cases import AccessRequestUseCases
-from api.dependencies import get_access_request_use_cases
 
 router = APIRouter(tags=["AccessFlow API"])
 
@@ -24,7 +21,6 @@ router = APIRouter(tags=["AccessFlow API"])
 
 @router.post("/auth/login", response_model=TokenResponse, tags=["Authentication"])
 def login(request: LoginRequest, user_repo = Depends(get_user_repository)):
-    """Autentica a un usuario validando su email y contraseña."""
     user = user_repo.get_by_email(request.email)
     
     if not user or not AuthProvider.verify_password(request.password, user.hashed_password):
@@ -48,7 +44,6 @@ def login(request: LoginRequest, user_repo = Depends(get_user_repository)):
         role=user.role.value
     )
 
-
 # ============================================================
 # Access Request Endpoints (Issue 91)
 # ============================================================
@@ -67,7 +62,6 @@ def list_requests(
     current_user: User = Depends(get_current_user),
     use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
 ):
-    # Por ahora retorna todo el mock, se filtrará por rol en DB real
     return [AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at) for r in use_cases.repo.get_all()]
 
 @router.get("/requests/{request_id}", response_model=AccessRequestResponse, tags=["Access Requests"])
@@ -79,7 +73,6 @@ def get_request_detail(
     r = use_cases.get_request(request_id)
     return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
 
-# Unificado para Manager o Security. El Use Case (vía Command) valida si el rol es correcto para el estado actual.
 @router.post("/requests/{request_id}/approve", response_model=AccessRequestResponse, tags=["Access Requests"])
 def approve_request(
     request_id: str,
@@ -109,7 +102,7 @@ def provision_request(
     return AccessRequestResponse(id=str(r.id), requester_id=r.requester_id, target_system=r.target_system, access_level=r.access_level.value, status=r.status.value, created_at=r.created_at)
 
 # ============================================================
-# Utility Endpoints (Mocks por ahora)
+# Utility Endpoints (Mocks)
 # ============================================================
 
 @router.get("/notifications", response_model=List[NotificationResponse], tags=["Utility"])
