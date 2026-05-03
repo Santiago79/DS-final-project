@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     container_name: accessflow-backend
@@ -62,7 +60,7 @@ services:
       - accessflow-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U accessflow_user"]
+      test: ["CMD-SHELL", "pg_isready -d accessflow_db -U accessflow_user"]
       interval: 10s
       timeout: 5s
       retries: 5
