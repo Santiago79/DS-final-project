@@ -5,8 +5,7 @@ These models implement the ORM mapping and are used by repositories
 to persist and retrieve domain objects.
 """
 
-from datetime import date, datetime, timezone
-from typing import Optional
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
