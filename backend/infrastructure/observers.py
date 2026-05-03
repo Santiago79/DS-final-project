@@ -6,8 +6,6 @@ These observers react to domain events and perform side effects:
 - AuditLogObserver: Persists event details to audit log
 """
 
-from typing import Optional
-
 from domain.events import (
     Evento,
     AccessRequestCreatedEvent,
@@ -24,7 +22,6 @@ from domain.interfaces.observador_evento import ObservadorEvento
 from infrastructure.postgres import (
     PostgresNotificationRepository,
     PostgresAuditLogRepository,
-    PostgresUserRepository,
 )
 from sqlalchemy.orm import Session
 
@@ -253,7 +250,7 @@ class AuditLogObserver(ObservadorEvento):
             user_id=request.requester_id,
             action="REQUEST_SUBMITTED",
             request_id=request.id,
-            details=f"Solicitud enviada para revisión",
+            details="Solicitud enviada para revisión",
         )
 
     def _log_manager_approval_required(self, evento: ManagerApprovalRequiredEvent) -> None:
@@ -263,7 +260,7 @@ class AuditLogObserver(ObservadorEvento):
             user_id=request.manager_id or "SYSTEM",
             action="MANAGER_APPROVAL_REQUIRED",
             request_id=request.id,
-            details=f"Aprobación de manager requerida",
+            details="Aprobación de manager requerida",
         )
 
     def _log_security_review_required(self, evento: SecurityReviewRequiredEvent) -> None:
