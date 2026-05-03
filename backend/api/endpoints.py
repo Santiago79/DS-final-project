@@ -1,8 +1,9 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 
 from application.dtos import (
-    LoginRequest, TokenResponse, CreateAccessRequestDTO, 
+    TokenResponse, CreateAccessRequestDTO, 
     AccessRequestResponse, ActionReasonDTO, 
     NotificationResponse, AuditLogResponse
 )
@@ -34,10 +35,14 @@ def map_to_response(req) -> AccessRequestResponse:
 # ============================================================
 
 @router.post("/auth/login", response_model=TokenResponse, tags=["Authentication"])
-def login(request: LoginRequest, user_repo = Depends(get_user_repository)):
-    user = user_repo.get_by_email(request.email)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    user_repo = Depends(get_user_repository)
+):
+    # OAuth2PasswordRequestForm usa 'username' por defecto, nosotros lo tratamos como 'email'
+    user = user_repo.get_by_email(form_data.username)
     
-    if not user or not AuthProvider.verify_password(request.password, user.hashed_password):
+    if not user or not AuthProvider.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos",
