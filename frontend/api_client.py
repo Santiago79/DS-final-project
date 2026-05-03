@@ -1,0 +1,46 @@
+import os
+import requests
+
+class AccessFlowClient:
+    def __init__(self):
+        self.base_url = os.getenv("BACKEND_API_URL", "http://backend:8000")
+        self.session = requests.Session()
+
+    def set_token(self, token: str):
+        self.session.headers.update({"Authorization": f"Bearer {token}"})
+
+    def login(self, email: str, password: str) -> dict:
+        url = f"{self.base_url}/auth/login"
+        payload = {"email": email, "password": password}
+        response = self.session.post(url, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        self.set_token(data["access_token"])
+        return data
+
+    def get_requests(self) -> list:
+        url = f"{self.base_url}/requests"
+        response = self.session.get(url)
+        response.raise_for_status()
+        return response.json()
+
+    def get_request_detail(self, request_id: str) -> dict:
+        url = f"{self.base_url}/requests/{request_id}"
+        response = self.session.get(url)
+        response.raise_for_status()
+        return response.json()
+
+    def create_request(self, target_system: str, access_level: str, justification: str, system_type: str = "OTHER", expiration_date: str = None) -> dict:
+        url = f"{self.base_url}/requests"
+        payload = {
+            "target_system": target_system,
+            "access_level": access_level,
+            "justification": justification,
+            "system_type": system_type,
+        }
+        if expiration_date:
+            payload["expiration_date"] = expiration_date
+
+        response = self.session.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
