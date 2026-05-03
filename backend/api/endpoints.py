@@ -1,8 +1,10 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
 
 from application.dtos import (
-    LoginRequest, TokenResponse, CreateAccessRequestDTO, 
+    TokenResponse, CreateAccessRequestDTO, 
     AccessRequestResponse, ActionReasonDTO, 
     NotificationResponse, AuditLogResponse
 )
@@ -12,6 +14,10 @@ from api.guards import require_role, require_any_role
 from domain.enums import UserRole
 from domain.entities import User
 from application.use_cases import AccessRequestUseCases
+
+# Imports necesarios para los nuevos endpoints
+from infrastructure.database import get_db
+from infrastructure.postgres import PostgresNotificationRepository, PostgresAuditLogRepository
 
 router = APIRouter(tags=["AccessFlow API"])
 
@@ -34,10 +40,13 @@ def map_to_response(req) -> AccessRequestResponse:
 # ============================================================
 
 @router.post("/auth/login", response_model=TokenResponse, tags=["Authentication"])
-def login(request: LoginRequest, user_repo = Depends(get_user_repository)):
-    user = user_repo.get_by_email(request.email)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    user_repo = Depends(get_user_repository)
+):
+    user = user_repo.get_by_email(form_data.username)
     
-    if not user or not AuthProvider.verify_password(request.password, user.hashed_password):
+    if not user or not AuthProvider.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos",
@@ -136,13 +145,21 @@ def provision_request(
     return map_to_response(req)
 
 # ============================================================
-# Utility Endpoints (Mocks pendientes Issue de Observers)
+# Utility Endpoints (Notificaciones y Auditoría Reales)
 # ============================================================
 
 @router.get("/notifications", response_model=List[NotificationResponse], tags=["Utility"])
-def get_notifications(current_user: User = Depends(get_current_user)):
-    return []
+def get_notifications(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    repo = PostgresNotificationRepository(db)
+    return repo.get_by_user(current_user.id)
 
 @router.get("/audit-log", response_model=List[AuditLogResponse], tags=["Utility"])
-def get_audit_log(current_user: User = Depends(require_role(UserRole.SYSTEM_ADMIN))):
-    return []
+def get_audit_log(
+    current_user: User = Depends(require_role(UserRole.SYSTEM_ADMIN)),
+    db: Session = Depends(get_db)
+):
+    repo = PostgresAuditLogRepository(db)
+    return repo.get_all()
