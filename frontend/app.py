@@ -123,10 +123,14 @@ def page_new_request():
             expiration_date = None
             
     if st.button("Crear Solicitud", type="primary"):
-        if not target_system or not justification:
-            st.error("Por favor, completa los campos requeridos (Sistema Destino y Justificación).")
+        if not target_system or len(target_system) < 2:
+            st.error("El Sistema Destino debe tener al menos 2 caracteres.")
+        elif not justification or len(justification) < 5:
+            st.error("La Justificación debe tener al menos 5 caracteres.")
         elif access_level == "ADMIN" and not expiration_date:
-             st.error("Para nivel ADMIN, debes proporcionar una fecha de expiración válida.")
+            st.error("Para nivel ADMIN, debes proporcionar una fecha de expiración válida.")
+        elif expiration_date and exp_date_input <= date.today():
+            st.error("La fecha de expiración no puede ser hoy. Debe ser una fecha futura.")
         else:
             try:
                 res = client.create_request(
@@ -137,8 +141,18 @@ def page_new_request():
                     expiration_date=expiration_date
                 )
                 st.success(f"Solicitud creada exitosamente con ID: {res['id']}")
+            except requests.exceptions.HTTPError as e:
+                try:
+                    err_msg = e.response.json().get("detail", str(e))
+                    if isinstance(err_msg, list):
+                        msgs = [f"- {err.get('loc', [''])[-1]}: {err.get('msg', '')}" for err in err_msg]
+                        st.error("Error de validación del servidor:\n" + "\n".join(msgs))
+                    else:
+                        st.error(f"Error devuelto por el servidor: {err_msg}")
+                except Exception:
+                    st.error(f"Error al crear la solicitud: {e}")
             except Exception as e:
-                st.error(f"Error al crear la solicitud: {e}")
+                st.error(f"Error inesperado: {e}")
 
 def main():
     _init_session()
