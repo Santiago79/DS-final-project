@@ -1,4 +1,3 @@
-from domain.enums import UserRole
 from domain.entities import User
 
 # Empezamos con la base de datos vacía para probar que el startup event funciona
