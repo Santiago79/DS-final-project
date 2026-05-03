@@ -20,12 +20,9 @@ def seed_test_users():
     ]
     
     for u_data in users_to_seed:
-        # 1. Verifica si no se duplican
         if not user_repo.get_by_email(u_data["email"]):
-            # 2. Hashea la contraseña con bcrypt
             hashed_pw = AuthProvider.get_password_hash(u_data["password"])
             
-            # 3. Asigna el rol correcto
             new_user = User(
                 name=u_data["name"],
                 email=u_data["email"],
@@ -33,8 +30,8 @@ def seed_test_users():
                 role=u_data["role"]
             )
             
-            # 4. Los crea automáticamente
-            user_repo.save(new_user)
+            # Cambiado a "add" para coincidir con la nueva interfaz
+            user_repo.add(new_user)
             print(f"✅ Usuario semilla creado: {u_data['email']} [{u_data['role'].value}]")
 
 
@@ -42,6 +39,15 @@ def seed_test_users():
 async def lifespan(app: FastAPI):
     # --- Startup Event ---
     print("Iniciando AccessFlow API...")
+    
+    # Intenta crear las tablas si el archivo de DB ya existe
+    try:
+        from infrastructure.database import create_all_tables
+        create_all_tables()
+        print("Tablas de base de datos validadas/creadas.")
+    except ImportError:
+        pass # Ignorar si Persona 3 aún no ha subido el archivo database.py
+        
     seed_test_users()
     yield
     # --- Shutdown Event ---

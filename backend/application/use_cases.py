@@ -25,10 +25,15 @@ class AccessRequestUseCases:
             manager_id=dto.manager_id
         )
         
+        # 1. Insertar primero
+        self.repo.add(request)
+        
+        # 2. Ejecutar comandos y cambiar estado
         CreateRequestCommand(request, self.event_bus).execute()
         SubmitRequestCommand(request, self.event_bus).execute()
         
-        self.repo.save(request)
+        # 3. Actualizar la BD con los cambios
+        self.repo.update(request)
         return request
 
     def get_request(self, request_id: str):
@@ -38,35 +43,34 @@ class AccessRequestUseCases:
         return request
 
     def list_requests(self, user: User):
-        # Por ahora retorna todas, luego se filtrará por rol en DB real
         return self.repo.get_all()
 
     def approve_request(self, request_id: str, reviewer: User):
         request = self.get_request(request_id)
         ApproveRequestCommand(request, self.event_bus, reviewer).execute()
-        self.repo.save(request)
+        self.repo.update(request)
         return request
 
     def reject_request(self, request_id: str, reviewer: User, reason: str):
         request = self.get_request(request_id)
         RejectRequestCommand(request, self.event_bus, reviewer, reason).execute()
-        self.repo.save(request)
+        self.repo.update(request)
         return request
 
     def request_changes(self, request_id: str, reviewer: User, comment: str):
         request = self.get_request(request_id)
         RequestChangesCommand(request, self.event_bus, reviewer, comment).execute()
-        self.repo.save(request)
+        self.repo.update(request)
         return request
 
     def provision_request(self, request_id: str, admin: User):
         request = self.get_request(request_id)
         ProvisionAccessCommand(request, self.event_bus, admin).execute()
-        self.repo.save(request)
+        self.repo.update(request)
         return request
 
     def cancel_request(self, request_id: str, user: User):
         request = self.get_request(request_id)
         CancelRequestCommand(request, self.event_bus).execute()
-        self.repo.save(request)
+        self.repo.update(request)
         return request
