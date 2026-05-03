@@ -67,10 +67,28 @@ services:
       timeout: 5s
       retries: 5
 
+  db-ui:
+    image: dpage/pgadmin4
+    container_name: accessflow-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@accessflow.com
+      - PGADMIN_DEFAULT_PASSWORD=root
+    ports:
+      - "8085:80"
+    depends_on:
+      - db
+    networks:
+      - accessflow-network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    restart: unless-stopped
+
 networks:
   accessflow-network:
     driver: bridge
 
 volumes:
   postgres_data:
+    driver: local
+  pgadmin_data:
     driver: local

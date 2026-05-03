@@ -12,3 +12,4 @@ venv/
 .idea/
 *.log
 postgres_data/
+AGENTS.md
