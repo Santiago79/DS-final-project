@@ -48,6 +48,11 @@ class AccessRequestUseCases:
     def approve_request(self, request_id: str, reviewer: User):
         request = self.get_request(request_id)
         ApproveRequestCommand(request, self.event_bus, reviewer).execute()
+        
+        from domain.enums import RequestStatus
+        if request.status == RequestStatus.APPROVED:
+            request.finalize_approval()
+            
         self.repo.update(request)
         return request
 

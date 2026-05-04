@@ -38,11 +38,17 @@ class AccessRequestResponse(BaseModel):
 # --- Utility DTOs ---
 class NotificationResponse(BaseModel):
     id: str
+    title: str
     message: str
+    status: str
+    request_id: Optional[str] = None
     created_at: datetime
+    read_at: Optional[datetime] = None
 
 class AuditLogResponse(BaseModel):
-    id: str
+    id: int
+    user_id: str
+    request_id: Optional[str] = None
     action: str
-    performed_by: str
-    timestamp: datetime
+    details: str
+    created_at: datetime

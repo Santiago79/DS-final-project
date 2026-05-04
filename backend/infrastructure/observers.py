@@ -89,18 +89,10 @@ class NotificationObserver(ObservadorEvento):
             self._on_access_expiring_soon(evento)
 
     def _on_request_created(self, evento: AccessRequestCreatedEvent) -> None:
-        """Notify manager and IT Admin when request is created."""
+        """Notify IT Admin when request is created."""
         request = evento.request
         
-        # Notify manager
-        if request.manager_id:
-            self.notification_repo.add(
-                user_id=request.manager_id,
-                title="Nueva solicitud de acceso",
-                message=f"El usuario {request.requester_name} solicita acceso a {request.target_system}",
-                request_id=request.id,
-            )
-        
+        # We only notify IT Admins here, manager will be notified in _on_manager_approval_required
         # Notify all IT Admins
         it_admins = self._get_it_admin_users()
         for it_admin in it_admins:
@@ -112,24 +104,25 @@ class NotificationObserver(ObservadorEvento):
             )
 
     def _on_request_submitted(self, evento: AccessRequestSubmittedEvent) -> None:
-        """Notify manager when request is submitted for review."""
-        request = evento.request
-        
-        if request.manager_id:
-            self.notification_repo.add(
-                user_id=request.manager_id,
-                title="Solicitud de acceso requiere tu aprobación",
-                message=f"Solicitud de {request.requester_name} para {request.target_system}",
-                request_id=request.id,
-            )
+        """This event is tracked in audit log. Manager is notified via ManagerApprovalRequiredEvent."""
+        pass
 
     def _on_manager_approval_required(self, evento: ManagerApprovalRequiredEvent) -> None:
         """Notify manager when approval is required."""
         request = evento.request
         
-        if request.manager_id:
+        manager_ids = [request.manager_id] if request.manager_id else []
+        if not manager_ids:
+            from infrastructure.database import SessionLocal
+            from infrastructure.postgres import PostgresUserRepository
+            from domain.enums import UserRole
+            with SessionLocal() as session:
+                repo = PostgresUserRepository(session)
+                manager_ids = [u.id for u in repo.get_all() if u.role == UserRole.MANAGER]
+                
+        for m_id in manager_ids:
             self.notification_repo.add(
-                user_id=request.manager_id,
+                user_id=m_id,
                 title="Aprobación requerida",
                 message=f"{request.requester_name} solicita {request.access_level.value} a {request.target_system}",
                 request_id=request.id,

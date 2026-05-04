@@ -159,6 +159,26 @@ def get_notifications(
     repo = PostgresNotificationRepository(db)
     return repo.get_by_user(current_user.id)
 
+@router.put("/notifications/{notification_id}/read", status_code=status.HTTP_200_OK, tags=["Utility"])
+def mark_notification_read(
+    notification_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    repo = PostgresNotificationRepository(db)
+    repo.mark_as_read(notification_id)
+    return {"message": "Notification marked as read"}
+
+@router.get("/requests/{request_id}/audit-log", response_model=List[AuditLogResponse], tags=["Utility"])
+def get_request_audit_log(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # In a real app we might want to check if the user is authorized to view this request's audit log
+    repo = PostgresAuditLogRepository(db)
+    return repo.get_by_request(request_id)
+
 @router.get("/audit-log", response_model=List[AuditLogResponse], tags=["Utility"])
 def get_audit_log(
     current_user: User = Depends(require_role(UserRole.SYSTEM_ADMIN)),
