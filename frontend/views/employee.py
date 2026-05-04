@@ -13,9 +13,15 @@ def page_my_requests():
             st.info("No tienes solicitudes creadas.")
             return
         
-        # Muestra un listado, usando expanders para el detalle
         for req in requests_list:
-            status_color = "🟢" if req["status"] == "APPROVED" else "🟡" if req["status"] in ["DRAFT", "SUBMITTED", "MANAGER_REVIEW", "SECURITY_REVIEW"] else "🔴"
+            # Determinar color de estado
+            if req["status"] == "APPROVED":
+                status_color = "🟢"
+            elif req["status"] in ["DRAFT", "SUBMITTED", "MANAGER_REVIEW", "SECURITY_REVIEW", "CHANGES_REQUESTED"]:
+                status_color = "🟡"
+            else:
+                status_color = "🔴"
+                
             with st.expander(f"{status_color} {req['target_system']} - {req['access_level']} ({req['status']})"):
                 st.write(f"**ID:** `{req['id']}`")
                 st.write(f"**Estado:** `{req['status']}`")
@@ -25,11 +31,86 @@ def page_my_requests():
                 if req.get('expiration_date'):
                     st.write(f"**Expira:** `{req['expiration_date']}`")
                 st.write(f"**Justificación:** {req['justification']}")
+                
                 if req['status'] == "REJECTED" and req.get('rejection_reason'):
                     st.error(f"**Motivo del rechazo:** {req['rejection_reason']}")
                 if req['status'] == "CHANGES_REQUESTED" and req.get('changes_requested_comment'):
                     st.warning(f"**Cambios solicitados:** {req['changes_requested_comment']}")
                 
+                # Nueva funcionalidad: Editar y Reenviar si el estado es CHANGES_REQUESTED
+                if req['status'] == "CHANGES_REQUESTED":
+                    st.divider()
+                    st.markdown("### ✏️ Editar y Reenviar Solicitud")
+                    with st.form(key=f"edit_form_{req['id']}"):
+                        new_target_system = st.text_input("Sistema Destino", value=req['target_system'])
+                        system_types = ["GITHUB", "DATABASE", "DASHBOARD", "CRM", "SUPPORT", "CLOUD", "ADMIN_PANEL", "PRODUCTIVE_DATABASE", "OTHER"]
+                        try:
+                            current_system_index = system_types.index(req['system_type']) if req['system_type'] in system_types else 0
+                        except ValueError:
+                            current_system_index = 0
+                        new_system_type = st.selectbox("Tipo de Sistema", system_types, index=current_system_index)
+                        new_access_level = st.selectbox(
+                            "Nivel de Acceso",
+                            ["READ", "WRITE", "ADMIN"],
+                            index=["READ", "WRITE", "ADMIN"].index(req['access_level'])
+                        )
+                        new_justification = st.text_area("Justificación", value=req['justification'])
+                        
+                        # Manejo de fecha de expiración
+                        if new_access_level == "ADMIN":
+                            st.warning("El nivel ADMIN requiere obligatoriamente una fecha de expiración.")
+                            default_exp_date = date.today()
+                            if req.get('expiration_date'):
+                                try:
+                                    default_exp_date = date.fromisoformat(req['expiration_date'])
+                                except:
+                                    pass
+                            new_exp_date = st.date_input("Fecha de Expiración", value=default_exp_date, min_value=date.today())
+                            new_expiration_date = new_exp_date.isoformat()
+                        else:
+                            use_exp_date = st.checkbox("¿Deseas establecer una fecha de expiración? (Opcional)", value=req.get('expiration_date') is not None)
+                            if use_exp_date:
+                                default_exp_date = date.today()
+                                if req.get('expiration_date'):
+                                    try:
+                                        default_exp_date = date.fromisoformat(req['expiration_date'])
+                                    except:
+                                        pass
+                                new_exp_date = st.date_input("Fecha de Expiración", value=default_exp_date, min_value=date.today())
+                                new_expiration_date = new_exp_date.isoformat()
+                            else:
+                                new_expiration_date = None
+                        
+                        submitted = st.form_submit_button("Guardar y Reenviar")
+                        if submitted:
+                            # Validaciones básicas
+                            if not new_target_system or len(new_target_system) < 2:
+                                st.error("El Sistema Destino debe tener al menos 2 caracteres.")
+                            elif not new_justification or len(new_justification) < 5:
+                                st.error("La Justificación debe tener al menos 5 caracteres.")
+                            elif new_access_level == "ADMIN" and not new_expiration_date:
+                                st.error("Para nivel ADMIN, debes proporcionar una fecha de expiración válida.")
+                            elif new_expiration_date and new_exp_date <= date.today():
+                                st.error("La fecha de expiración debe ser futura.")
+                            else:
+                                try:
+                                    # 1. Actualizar la solicitud (el backend la pasa a DRAFT si es necesario)
+                                    client.update_request(
+                                        req['id'],
+                                        new_target_system,
+                                        new_access_level,
+                                        new_justification,
+                                        new_system_type,
+                                        new_expiration_date
+                                    )
+                                    # 2. Reenviar la solicitud
+                                    client.submit_request(req['id'])
+                                    st.success("Solicitud reenviada exitosamente.")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error al reenviar: {e}")
+                
+                # Historial de auditoría (se muestra siempre)
                 st.divider()
                 if st.checkbox("Ver Historial de Auditoría", key=f"audit_{req['id']}"):
                     try:
@@ -44,6 +125,7 @@ def page_my_requests():
                 
     except Exception as e:
         st.error(f"Error al obtener solicitudes: {e}")
+
 
 def page_new_request():
     st.title("Nueva Solicitud de Acceso")

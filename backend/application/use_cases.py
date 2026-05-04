@@ -1,3 +1,4 @@
+from domain.enums import RequestStatus
 from fastapi import HTTPException
 from domain.entities import User
 from domain.factories import AccessRequestFactory
@@ -77,5 +78,44 @@ class AccessRequestUseCases:
     def cancel_request(self, request_id: str, user: User):
         request = self.get_request(request_id)
         CancelRequestCommand(request, self.event_bus).execute()
+        self.repo.update(request)
+        return request
+    def return_to_draft(self, request_id: str, user: User):
+        request = self.get_request(request_id)
+        # Validar que el usuario sea el dueño
+        if request.requester_id != user.id:
+            raise HTTPException(status_code=403, detail="Solo el solicitante puede editar esta solicitud.")
+        request.return_to_draft()  # Llama al método del estado
+        self.repo.update(request)
+        return request
+    def update_request(self, request_id: str, dto: CreateAccessRequestDTO, user: User):
+        request = self.get_request(request_id)
+        if request.requester_id != user.id:
+            raise HTTPException(status_code=403, detail="Solo el solicitante puede editar esta solicitud.")
+        if request.status not in [RequestStatus.DRAFT, RequestStatus.CHANGES_REQUESTED]:
+            raise HTTPException(status_code=400, detail="La solicitud solo puede editarse en estado DRAFT o cuando se solicitaron cambios.")
+
+        # Si está en CHANGES_REQUESTED, primero la movemos a DRAFT
+        if request.status == RequestStatus.CHANGES_REQUESTED:
+            request.return_to_draft()  # Este método ya existe en el estado
+
+        # Actualizar campos
+        request.target_system = dto.target_system
+        request.access_level = dto.access_level
+        request.justification = dto.justification
+        request.system_type = dto.system_type
+        request.expiration_date = dto.expiration_date
+        # manager_id se mantiene igual
+
+        self.repo.update(request)
+        return request
+    def submit_request(self, request_id: str, user: User):
+        request = self.get_request(request_id)
+        if request.requester_id != user.id:
+            raise HTTPException(status_code=403, detail="Solo el solicitante puede enviar esta solicitud.")
+        if request.status != RequestStatus.DRAFT:
+            raise HTTPException(status_code=400, detail="Solo se puede enviar una solicitud en estado DRAFT.")
+
+        SubmitRequestCommand(request, self.event_bus).execute()
         self.repo.update(request)
         return request

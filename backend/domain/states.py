@@ -63,6 +63,10 @@ class RequestState(ABC):
         raise InvalidStateTransitionError(
             f"finalize_approval no es válido en el estado {request.status.value}"
         )
+    @abstractmethod
+    def return_to_draft(self, request: AccessRequest) -> None:
+        """Volver a DRAFT para editar la solicitud (cuando se solicitaron cambios)."""
+        pass
 
 
 # ============================================================
@@ -100,6 +104,10 @@ class DraftState(RequestState):
         raise InvalidStateTransitionError(
             "No se puede completar provisioning: la solicitud no ha sido aprobada."
         )
+    def return_to_draft(self, request: AccessRequest) -> None:
+        raise InvalidStateTransitionError(
+        f"No se puede volver a DRAFT en el estado {request.status.value}"
+    )
 
 
 class SubmittedState(RequestState):
@@ -137,6 +145,10 @@ class SubmittedState(RequestState):
         raise InvalidStateTransitionError(
             "No se puede completar provisioning: la solicitud no ha sido aprobada."
         )
+    def return_to_draft(self, request: AccessRequest) -> None:
+        raise InvalidStateTransitionError(
+        f"No se puede volver a DRAFT en el estado {request.status.value}"
+    )
 
 
 class ManagerReviewState(RequestState):
@@ -188,6 +200,11 @@ class ManagerReviewState(RequestState):
             "No se puede completar provisioning: la solicitud no ha sido aprobada."
         )
 
+    def return_to_draft(self, request: AccessRequest) -> None:
+        raise InvalidStateTransitionError(
+            f"No se puede volver a DRAFT en el estado {request.status.value}"
+        )
+
 
 class SecurityReviewState(RequestState):
     """
@@ -226,6 +243,10 @@ class SecurityReviewState(RequestState):
         raise InvalidStateTransitionError(
             "No se puede completar provisioning: la solicitud no ha sido aprobada."
         )
+    def return_to_draft(self, request: AccessRequest) -> None:
+        raise InvalidStateTransitionError(
+        f"No se puede volver a DRAFT en el estado {request.status.value}"
+    )
 
 
 class ApprovedState(RequestState):
@@ -270,6 +291,10 @@ class ApprovedState(RequestState):
         después de que la solicitud llegue al estado APPROVED.
         """
         request._transition_to(RequestStatus.READY_FOR_PROVISIONING)
+    def return_to_draft(self, request: AccessRequest) -> None:
+        raise InvalidStateTransitionError(
+        f"No se puede volver a DRAFT en el estado {request.status.value}"
+    )
 
 class ReadyForProvisioningState(RequestState):
     """
@@ -305,7 +330,10 @@ class ReadyForProvisioningState(RequestState):
             raise UnauthorizedError("Solo IT Admin puede completar el provisioning.")
         request.provisioned_by = it_admin.id
         request._transition_to(RequestStatus.COMPLETED)
-
+    def return_to_draft(self, request: AccessRequest) -> None:
+        raise InvalidStateTransitionError(
+        f"No se puede volver a DRAFT en el estado {request.status.value}"
+    )
 
 class CompletedState(RequestState):
     """
@@ -342,6 +370,10 @@ class CompletedState(RequestState):
         raise InvalidStateTransitionError(
             "La solicitud ya fue completada."
         )
+    def return_to_draft(self, request: AccessRequest) -> None:
+     raise InvalidStateTransitionError(
+        f"No se puede volver a DRAFT en el estado {request.status.value}"
+    )
 
 
 class RejectedState(RequestState):
@@ -379,6 +411,10 @@ class RejectedState(RequestState):
         raise InvalidStateTransitionError(
             "No se puede completar provisioning: la solicitud fue rechazada."
         )
+    def return_to_draft(self, request: AccessRequest) -> None:
+     raise InvalidStateTransitionError(
+        f"No se puede volver a DRAFT en el estado {request.status.value}"
+    )
 
 
 class CancelledState(RequestState):
@@ -416,6 +452,10 @@ class CancelledState(RequestState):
         raise InvalidStateTransitionError(
             "No se puede completar provisioning: la solicitud fue cancelada."
         )
+    def return_to_draft(self, request: AccessRequest) -> None:
+     raise InvalidStateTransitionError(
+        f"No se puede volver a DRAFT en el estado {request.status.value}"
+    )
 
 
 class ChangesRequestedState(RequestState):
@@ -452,7 +492,9 @@ class ChangesRequestedState(RequestState):
         raise InvalidStateTransitionError(
             "No se puede completar provisioning: hay cambios solicitados pendientes."
         )
-
+    
+    def return_to_draft(self, request: AccessRequest) -> None:
+     request._transition_to(RequestStatus.DRAFT)
 
 # ============================================================
 # Factory para crear el estado según el enum
