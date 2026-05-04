@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.endpoints import router as api_router
 from api.dependencies import setup_dependencies, get_user_repository
@@ -47,6 +48,15 @@ app = FastAPI(
     description="API para la gestión y aprobación de accesos en USFQ",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# Configurar CORS para permitir solicitudes desde el frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # En producción, especifica el dominio exacto del frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(api_router)
