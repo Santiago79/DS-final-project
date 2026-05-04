@@ -23,6 +23,36 @@ class AccessFlowClient:
         response = self.session.get(url)
         response.raise_for_status()
         return response.json()
+        
+    def provision_request(self, request_id: str) -> dict:
+        url = f"{self.base_url}/requests/{request_id}/provision"
+        response = self.session.post(url)
+        response.raise_for_status()
+        return response.json()
+
+    def get_notifications(self, unread_only: bool = False) -> list:
+        url = f"{self.base_url}/notifications"
+        response = self.session.get(url)
+        response.raise_for_status()
+        notifications = response.json()
+        if unread_only:
+            notifications = [n for n in notifications if n["status"] == "PENDING"]
+        return notifications
+
+    def mark_notification_read(self, notification_id: str) -> dict:
+        url = f"{self.base_url}/notifications/{notification_id}/read"
+        response = self.session.put(url)
+        response.raise_for_status()
+        return response.json()
+
+    def get_audit_log(self, request_id: str = None) -> list:
+        if request_id:
+            url = f"{self.base_url}/requests/{request_id}/audit-log"
+        else:
+            url = f"{self.base_url}/audit-log"
+        response = self.session.get(url)
+        response.raise_for_status()
+        return response.json()
 
     def get_request_detail(self, request_id: str) -> dict:
         url = f"{self.base_url}/requests/{request_id}"

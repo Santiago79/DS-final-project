@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import date
 import requests
+from utils import format_local_date
 
 def page_my_requests():
     st.title("Mis Solicitudes")
@@ -20,7 +21,7 @@ def page_my_requests():
                 st.write(f"**Estado:** `{req['status']}`")
                 st.write(f"**Nivel de Acceso:** `{req['access_level']}`")
                 st.write(f"**Sistema:** `{req['target_system']}` ({req['system_type']})")
-                st.write(f"**Fecha Creación:** `{req['created_at'][:10]}`")
+                st.write(f"**Fecha Creación:** `{format_local_date(req['created_at'])}`")
                 if req.get('expiration_date'):
                     st.write(f"**Expira:** `{req['expiration_date']}`")
                 st.write(f"**Justificación:** {req['justification']}")
@@ -28,6 +29,18 @@ def page_my_requests():
                     st.error(f"**Motivo del rechazo:** {req['rejection_reason']}")
                 if req['status'] == "CHANGES_REQUESTED" and req.get('changes_requested_comment'):
                     st.warning(f"**Cambios solicitados:** {req['changes_requested_comment']}")
+                
+                st.divider()
+                if st.checkbox("Ver Historial de Auditoría", key=f"audit_{req['id']}"):
+                    try:
+                        logs = client.get_audit_log(req['id'])
+                        if logs:
+                            for log in logs:
+                                st.markdown(f"- `{format_local_date(log['created_at'])}` **{log['action']}** (por {log['user_id']}): {log['details']}")
+                        else:
+                            st.write("No hay registros disponibles.")
+                    except Exception as e:
+                        st.error("No se pudo cargar el historial.")
                 
     except Exception as e:
         st.error(f"Error al obtener solicitudes: {e}")
