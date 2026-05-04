@@ -92,3 +92,31 @@ class AccessFlowClient:
         response = self.session.post(url, json={"reason": reason})
         response.raise_for_status()
         return response.json()
+    
+    def return_to_draft(self, request_id: str) -> dict:
+        """Devuelve la solicitud a DRAFT para edición (cuando se solicitaron cambios)."""
+        url = f"{self.base_url}/requests/{request_id}/return-to-draft"
+        response = self.session.post(url)
+        response.raise_for_status()
+        return response.json()
+    def update_request(self, request_id: str, target_system: str, access_level: str,
+                   justification: str, system_type: str = "OTHER",
+                   expiration_date: str = None) -> dict:
+        url = f"{self.base_url}/requests/{request_id}"
+        payload = {
+            "target_system": target_system,
+            "access_level": access_level,
+            "justification": justification,
+            "system_type": system_type,
+        }
+        if expiration_date:
+            payload["expiration_date"] = expiration_date
+        response = self.session.put(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    def submit_request(self, request_id: str) -> dict:
+        url = f"{self.base_url}/requests/{request_id}/submit"
+        response = self.session.post(url)
+        response.raise_for_status()
+        return response.json()

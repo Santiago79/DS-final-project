@@ -74,6 +74,15 @@ def login(
 # Access Request Endpoints
 # ============================================================
 
+@router.post("/requests/{request_id}/submit", response_model=AccessRequestResponse, tags=["Access Requests"])
+def submit_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.submit_request(request_id, current_user)
+    return map_to_response(req)
+
 @router.post("/requests", status_code=status.HTTP_201_CREATED, response_model=AccessRequestResponse, tags=["Access Requests"])
 def create_access_request(
     payload: CreateAccessRequestDTO,
@@ -186,3 +195,22 @@ def get_audit_log(
 ):
     repo = PostgresAuditLogRepository(db)
     return repo.get_all()
+
+@router.post("/requests/{request_id}/return-to-draft", response_model=AccessRequestResponse, tags=["Access Requests"])
+def return_to_draft(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.return_to_draft(request_id, current_user)
+    return map_to_response(req)
+
+@router.put("/requests/{request_id}", response_model=AccessRequestResponse, tags=["Access Requests"])
+def update_request(
+    request_id: str,
+    payload: CreateAccessRequestDTO,
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.update_request(request_id, payload, current_user)
+    return map_to_response(req)
