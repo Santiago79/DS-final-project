@@ -26,12 +26,15 @@ def map_to_response(req) -> AccessRequestResponse:
     return AccessRequestResponse(
         id=str(req.id),
         requester_id=req.requester_id,
+        requester_name=req.requester_name,
         target_system=req.target_system,
         access_level=req.access_level.value,
         justification=req.justification,
         system_type=req.system_type.value,
         expiration_date=req.expiration_date,
         status=req.status.value,
+        rejection_reason=req.rejection_reason,
+        changes_requested_comment=req.changes_requested_comment,
         created_at=req.created_at
     )
 
