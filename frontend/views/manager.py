@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+from utils import format_local_date
 
 def page_manager_dashboard():
     st.title("Bandeja de Aprobación - Manager")
@@ -62,6 +63,18 @@ def page_manager_dashboard():
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Error al solicitar cambios: {e}")
+                                
+                st.divider()
+                if st.checkbox("Ver Historial de Auditoría", key=f"audit_{req['id']}"):
+                    try:
+                        logs = client.get_audit_log(req['id'])
+                        if logs:
+                            for log in logs:
+                                st.markdown(f"- `{format_local_date(log['created_at'])}` **{log['action']}** (por {log['user_id']}): {log['details']}")
+                        else:
+                            st.write("No hay registros disponibles.")
+                    except Exception as e:
+                        st.error("No se pudo cargar el historial.")
                                 
     except Exception as e:
         st.error(f"Error al obtener las solicitudes: {e}")

@@ -6,6 +6,9 @@ from api_client import AccessFlowClient
 from views.employee import page_my_requests, page_new_request
 from views.manager import page_manager_dashboard
 from views.security import page_security_dashboard
+from views.it_admin import page_it_admin_dashboard
+from views.notifications import page_notifications
+from views.audit import page_system_audit
 
 # Configuracion de página
 st.set_page_config(page_title="AccessFlow", page_icon="🔐", layout="wide")
@@ -48,7 +51,7 @@ def page_login():
 def logout():
     st.session_state.token = None
     st.session_state.role = None
-    st.session_state.client = AccessFlowClient() # Reset client
+    st.session_state.client = AccessFlowClient()
     st.rerun()
 
 def render_sidebar():
@@ -57,25 +60,22 @@ def render_sidebar():
     st.sidebar.markdown(f"**Rol:** {role}")
     
     # Opciones de navegación dependiendo del rol
-    selected_page = None
+    options = []
     if role == "EMPLOYEE":
-        selected_page = st.sidebar.radio(
-            "Navegación",
-            ["Mis Solicitudes", "Nueva Solicitud"]
-        )
+        options = ["Mis Solicitudes", "Nueva Solicitud", "Notificaciones"]
     elif role == "MANAGER":
-        selected_page = st.sidebar.radio(
-            "Navegación",
-            ["Bandeja de Aprobación"]
-        )
+        options = ["Bandeja de Aprobación", "Notificaciones"]
     elif role == "SECURITY_REVIEWER":
-        selected_page = st.sidebar.radio(
-            "Navegación",
-            ["Revisión de Seguridad"]
-        )
+        options = ["Revisión de Seguridad", "Notificaciones"]
+    elif role == "IT_ADMIN":
+        options = ["Provisionamiento", "Notificaciones"]
+    elif role == "SYSTEM_ADMIN":
+        options = ["Auditoría Global", "Notificaciones"]
     else:
         st.sidebar.info(f"Vistas para el rol {role} se implementarán posteriormente.")
-        selected_page = "Pendiente"
+        options = ["Notificaciones"]
+
+    selected_page = st.sidebar.radio("Navegación", options)
     
     st.sidebar.divider()
     if st.sidebar.button("Cerrar Sesión"):
@@ -100,7 +100,13 @@ def main():
             page_manager_dashboard()
         elif page == "Revisión de Seguridad":
             page_security_dashboard()
-        elif page == "Pendiente":
+        elif page == "Provisionamiento":
+            page_it_admin_dashboard()
+        elif page == "Notificaciones":
+            page_notifications()
+        elif page == "Auditoría Global":
+            page_system_audit()
+        else:
             st.title("Pantalla Pendiente")
             st.info("Funcionalidad no implementada en esta fase.")
 
