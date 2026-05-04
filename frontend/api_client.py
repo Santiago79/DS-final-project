@@ -11,8 +11,8 @@ class AccessFlowClient:
 
     def login(self, email: str, password: str) -> dict:
         url = f"{self.base_url}/auth/login"
-        payload = {"email": email, "password": password}
-        response = self.session.post(url, json=payload)
+        payload = {"username": email, "password": password}
+        response = self.session.post(url, data=payload)
         response.raise_for_status()
         data = response.json()
         self.set_token(data["access_token"])
@@ -42,5 +42,23 @@ class AccessFlowClient:
             payload["expiration_date"] = expiration_date
 
         response = self.session.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    def approve_request(self, request_id: str) -> dict:
+        url = f"{self.base_url}/requests/{request_id}/approve"
+        response = self.session.post(url)
+        response.raise_for_status()
+        return response.json()
+
+    def reject_request(self, request_id: str, reason: str) -> dict:
+        url = f"{self.base_url}/requests/{request_id}/reject"
+        response = self.session.post(url, json={"reason": reason})
+        response.raise_for_status()
+        return response.json()
+
+    def request_changes(self, request_id: str, reason: str) -> dict:
+        url = f"{self.base_url}/requests/{request_id}/request-changes"
+        response = self.session.post(url, json={"reason": reason})
         response.raise_for_status()
         return response.json()
