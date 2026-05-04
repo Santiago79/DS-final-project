@@ -216,4 +216,46 @@ No se acepta despliegue directo a producción desde ramas feature. El flujo gara
 | **Dev** | Backend | [https://pset-accesflow-backend-dev.onrender.com](https://pset-accesflow-backend-dev.onrender.com) |
 | **Prod** | Frontend | [https://pset-accesflow-frontend-prod.onrender.com](https://pset-accesflow-frontend-prod.onrender.com) |
 | **Prod** | Backend | [https://pset-accesflow-backend-prod.onrender.com](https://pset-accesflow-backend-prod.onrender.com) |
+
 ---
+
+## 8. Usuarios de prueba
+
+El sistema incluye cinco usuarios predefinidos que se crean automáticamente al iniciar la aplicación:
+
+| Rol | Email | Contraseña | Permisos |
+|-----|-------|-----------|----------|
+| **Employee** | `employee@accessflow.com` | `employee123` | Crear solicitudes de acceso, ver sus solicitudes, recibir notificaciones |
+| **Manager** | `manager@accessflow.com` | `manager123` | Aprobar, rechazar o solicitar cambios en solicitudes de su equipo |
+| **Security Reviewer** | `security@accessflow.com` | `security123` | Revisar accesos sensibles (ADMIN y bases de datos productivas), aprobar o rechazar |
+| **IT Admin** | `itadmin@accessflow.com` | `itadmin123` | Completar el provisioning de accesos aprobados |
+| **System Admin** | `admin@accessflow.com` | `admin123` | Acceso total: ver todas las solicitudes, auditoría global, notificaciones |
+
+---
+
+## 9. Flujo principal del sistema
+
+1. **Inicio de sesión:** El usuario accede con su email y contraseña. El sistema valida sus credenciales y carga la vista correspondiente a su rol.
+
+2. **Creación de solicitud (Employee):** El empleado completa el formulario con el sistema de destino, el tipo de sistema, el nivel de acceso (READ/WRITE/ADMIN) y una justificación. Si el nivel es ADMIN, la fecha de expiración es obligatoria; para READ y WRITE es opcional.
+
+3. **Envío a revisión:** La solicitud se crea en estado DRAFT y se envía automáticamente a SUBMITTED y luego a MANAGER_REVIEW. El sistema notifica al Manager correspondiente.
+
+4. **Aprobación del Manager:** El Manager revisa la solicitud en su bandeja. Puede **aprobar** (si el acceso es READ o WRITE y no es a base productiva, pasa directamente a APPROVED), **rechazar** (la solicitud queda en estado final REJECTED y no puede reabrirse) o **solicitar cambios** (el empleado deberá editar y reenviar la solicitud).
+
+5. **Revisión de seguridad (si aplica):** Si el acceso es ADMIN o a una base de datos productiva, la solicitud pasa automáticamente a SECURITY_REVIEW. El Security Reviewer puede aprobarla o rechazarla.
+
+6. **Preparación para provisioning:** Una vez que la solicitud llega al estado APPROVED, el sistema la mueve automáticamente a READY_FOR_PROVISIONING y notifica al IT Admin.
+
+7. **Provisionamiento (IT Admin):** El IT Admin ve las solicitudes listas para provisioning y, tras ejecutar la acción, la solicitud pasa al estado final COMPLETED. El acceso queda registrado y el solicitante recibe una notificación.
+
+8. **Notificaciones y auditoría:** Durante todo el flujo, los usuarios reciben notificaciones en la aplicación sobre los eventos relevantes. Cada acción queda registrada en el log de auditoría, visible para el System Admin y asociada a cada solicitud.
+
+---
+
+## 10. Limitaciones conocidas
+
+- **Provisión de acceso simulada:** Completar el provisioning no ejecuta ninguna acción real sobre los sistemas externos (GitHub, bases de datos, etc.). Es un registro simbólico en la plataforma.
+- **Revocación no automática:** El sistema detecta y notifica accesos próximos a expirar, pero no revoca los accesos de forma automática. Esta funcionalidad está fuera del alcance del MVP.
+- **Sin integración con Active Directory ni escaneo real de permisos:** El sistema no sincroniza con directorios externos ni realiza verificaciones automáticas de los permisos existentes fuera de la plataforma.
+- **Reportes de compliance básicos:** La auditoría y las consultas son funcionales, pero los reportes avanzados de cumplimiento (exportación, dashboards específicos) no están incluidos en esta versión.
