@@ -223,6 +223,12 @@ class AccessRequest:
         """Delega el paso a READY_FOR_PROVISIONING al estado actual."""
         self.state.finalize_approval(self)
         self.updated_at = datetime.now(timezone.utc)
+
+    def return_to_draft(self) -> None:
+        """Devuelve la solicitud a DRAFT para edición."""
+        self.state.return_to_draft(self)
+        self.updated_at = datetime.now(timezone.utc)
+
 # ============================================================
 # AuditLog
 # ============================================================
