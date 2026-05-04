@@ -16,16 +16,20 @@ def seed_test_users():
         {"name": "Manager", "email": "manager@accessflow.com", "password": "manager123", "role": UserRole.MANAGER},
         {"name": "Security Reviewer", "email": "security@accessflow.com", "password": "security123", "role": UserRole.SECURITY_REVIEWER},
         {"name": "IT Admin", "email": "itadmin@accessflow.com", "password": "itadmin123", "role": UserRole.IT_ADMIN},
+        {"id": "SYSTEM", "name": "System Automated", "email": "system@accessflow.com", "password": "system123", "role": UserRole.SYSTEM_ADMIN},
     ]
     for u_data in users_to_seed:
         if not user_repo.get_by_email(u_data["email"]):
             hashed_pw = AuthProvider.get_password_hash(u_data["password"])
-            new_user = User(
-                name=u_data["name"],
-                email=u_data["email"],
-                hashed_password=hashed_pw,
-                role=u_data["role"]
-            )
+            user_args = {
+                "name": u_data["name"],
+                "email": u_data["email"],
+                "hashed_password": hashed_pw,
+                "role": u_data["role"]
+            }
+            if "id" in u_data:
+                user_args["id"] = u_data["id"]
+            new_user = User(**user_args)
             user_repo.add(new_user)
             print(f"✅ Usuario semilla creado: {u_data['email']} [{u_data['role'].value}]")
 

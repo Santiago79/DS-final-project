@@ -62,13 +62,18 @@ class CreateRequestCommand(RequestCommand):
 class SubmitRequestCommand(RequestCommand):
     """
     Comando para enviar la solicitud a revisión.
-    Transiciona de DRAFT a SUBMITTED.
+    Transiciona de DRAFT a SUBMITTED y luego automáticamente a MANAGER_REVIEW.
     """
 
     def execute(self) -> None:
         self.request.submit()
         event = AccessRequestSubmittedEvent(request=self.request)
         self.event_bus.publish(event)
+        
+        # El sistema la mueve automáticamente a MANAGER_REVIEW
+        from domain.enums import RequestStatus
+        self.request._transition_to(RequestStatus.MANAGER_REVIEW)
+        
         manager_event = ManagerApprovalRequiredEvent(request=self.request)
         self.event_bus.publish(manager_event)
 

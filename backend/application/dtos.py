@@ -31,6 +31,8 @@ class AccessRequestResponse(BaseModel):
     system_type: Optional[str] = None
     expiration_date: Optional[date] = None
     status: str
+    rejection_reason: Optional[str] = None
+    changes_requested_comment: Optional[str] = None
     created_at: datetime
 
 # --- Utility DTOs ---
