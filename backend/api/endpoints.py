@@ -74,6 +74,15 @@ def login(
 # Access Request Endpoints
 # ============================================================
 
+@router.post("/requests/{request_id}/submit", response_model=AccessRequestResponse, tags=["Access Requests"])
+def submit_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    use_cases: AccessRequestUseCases = Depends(get_access_request_use_cases)
+):
+    req = use_cases.submit_request(request_id, current_user)
+    return map_to_response(req)
+
 @router.post("/requests", status_code=status.HTTP_201_CREATED, response_model=AccessRequestResponse, tags=["Access Requests"])
 def create_access_request(
     payload: CreateAccessRequestDTO,
