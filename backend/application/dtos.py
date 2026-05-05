@@ -17,7 +17,6 @@ class CreateAccessRequestDTO(BaseModel):
     justification: str
     system_type: SystemType = SystemType.OTHER
     expiration_date: Optional[date] = None
-    manager_id: Optional[str] = None
 
 class ActionReasonDTO(BaseModel):
     reason: str
