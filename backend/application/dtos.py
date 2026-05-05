@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import date, datetime
 from domain.enums import AccessLevel, SystemType
@@ -17,7 +17,6 @@ class CreateAccessRequestDTO(BaseModel):
     justification: str
     system_type: SystemType = SystemType.OTHER
     expiration_date: Optional[date] = None
-    manager_id: Optional[str] = None
 
 class ActionReasonDTO(BaseModel):
     reason: str

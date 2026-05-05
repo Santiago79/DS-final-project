@@ -23,7 +23,7 @@ class AccessRequestUseCases:
             justification=dto.justification,
             system_type=dto.system_type,
             expiration_date=dto.expiration_date,
-            manager_id=dto.manager_id
+            manager_id=None
         )
         
         # 1. Insertar primero
