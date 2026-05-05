@@ -23,7 +23,7 @@ def _init_session():
 
 def page_login():
     st.title("🔐 AccessFlow - Iniciar Sesión")
-    st.markdown("Bienvenido al sistema de gestión de accesos.")
+    st.markdown("Bienvenido al sistema de gestión de accesos (test).")
     
     with st.container():
         email = st.text_input("Correo electrónico", placeholder="ejemplo@accessflow.com")
