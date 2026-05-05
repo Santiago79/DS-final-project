@@ -243,7 +243,7 @@ El sistema incluye cinco usuarios predefinidos que se crean automáticamente al 
 
 4. **Aprobación del Manager:** El Manager revisa la solicitud en su bandeja. Puede **aprobar** (si el acceso es READ o WRITE y no es a base productiva, pasa directamente a APPROVED), **rechazar** (la solicitud queda en estado final REJECTED y no puede reabrirse) o **solicitar cambios** (el empleado deberá editar y reenviar la solicitud).
 
-5. **Revisión de seguridad (si aplica):** Si el acceso es ADMIN o a una base de datos productiva, la solicitud pasa automáticamente a SECURITY_REVIEW. El Security Reviewer puede aprobarla o rechazarla.
+5. **Revisión de seguridad (si aplica):** Si el acceso es ADMIN o a una base de datos productiva, una vez que el Manager aprueba la solicitud, el sistema la mueve automáticamente a SECURITY_REVIEW. El Security Reviewer puede entonces aprobarla o rechazarla.
 
 6. **Preparación para provisioning:** Una vez que la solicitud llega al estado APPROVED, el sistema la mueve automáticamente a READY_FOR_PROVISIONING y notifica al IT Admin.
 
